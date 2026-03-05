@@ -1,0 +1,1653 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>銓展通訊數位門市系統</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- 模組匯入對照表 -->
+  <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "lucide-react": "https://esm.sh/lucide-react@0.292.0?external=react",
+        "firebase/app": "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js",
+        "firebase/firestore": "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"
+      }
+    }
+  </script>
+</head>
+<body class="bg-slate-50 text-slate-900 m-0 p-0 font-sans">
+  <div id="root"></div>
+
+  <!-- React 應用程式代碼 -->
+  <script type="text/babel" data-type="module">
+    import React, { useState, useRef, useEffect } from 'react';
+    import { createRoot } from 'react-dom/client';
+    // ?? 修復：移除了 CloudUpload，改用已有的 UploadCloud 或 Upload 替代
+    import { Phone, MapPin, PhoneCall, ShieldCheck, Menu, X, XCircle, Search, List, Smartphone, Upload, Download, Cloud, Trash2, CheckCircle, Database, LayoutList, Camera, AlertCircle, Store, Zap, FileText, Cpu, PlusSquare, RefreshCw, UploadCloud } from 'lucide-react';
+    import { initializeApp } from 'firebase/app';
+    import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+    import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
+
+    // ==========================================
+    // 1. 全域共用資源與 Firebase 設定
+    // ==========================================
+    const LOGO_ASSETS = {
+      apple: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="384" height="512" viewBox="0 0 384 512" fill="%23121619"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>`,
+      samsung: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="%23121619"><path d="M256 160c-141.4 0-256 43-256 96s114.6 96 256 96 256-43 256-96-114.6-96-256-96zm0 160c-106 0-192-28.7-192-64s86-64 192-64 192 28.7 192 64-86 64-192 64z"/><path d="M120.4 233.9c-4.1 0-7.3 2.1-7.3 5.4 0 3.3 3.2 5.4 7.3 5.4 4.1 0 7.3-2.1 7.3-5.4 0-3.3-3.2-5.4-7.3-5.4zm30 0c-4.1 0-7.3 2.1-7.3 5.4 0 3.3 3.2 5.4 7.3 5.4s7.3-2.1 7.3-5.4c0-3.3-3.2-5.4-7.3-5.4zm30 0c-4.1 0-7.3 2.1-7.3 5.4 0 3.3 3.2 5.4 7.3 5.4 4.1 0 7.3-2.1 7.3-5.4 0-3.3-3.2-5.4-7.3-5.4zm30 0c-4.1 0-7.3 2.1-7.3 5.4 0 3.3 3.2 5.4 7.3 5.4s7.3-2.1 7.3-5.4c0-3.3-3.2-5.4-7.3-5.4z"/></svg>`,
+      quanzhan: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="450" height="120" viewBox="0 0 450 120"><defs><linearGradient id="metal" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="%23f8fafc" /><stop offset="25%" stop-color="%2394a3b8" /><stop offset="50%" stop-color="%23334155" /><stop offset="75%" stop-color="%2394a3b8" /><stop offset="100%" stop-color="%23e2e8f0" /></linearGradient><filter id="shadow" x="-10%" y="-10%" width="120%" height="120%"><feDropShadow dx="2" dy="4" stdDeviation="4" flood-color="%23000000" flood-opacity="0.35"/></filter></defs><g filter="url(%23shadow)"><path d="M 45 15 L 25 15 C 15 15 10 20 10 30 L 10 90 C 10 100 15 105 25 105 L 45 105" fill="none" stroke="url(%23metal)" stroke-width="10" stroke-linecap="square" /><path d="M 12 40 L 65 40 L 25 75 L 65 75" fill="none" stroke="url(%23metal)" stroke-width="10" stroke-linejoin="miter" stroke-linecap="square"/><rect x="38" y="80" width="40" height="18" rx="2" fill="url(%23metal)"/><text x="58" y="93" font-family="Arial, sans-serif" font-size="12" font-weight="900" fill="%230f172a" text-anchor="middle" letter-spacing="1">1989</text><text x="90" y="65" font-family="'Microsoft JhengHei', sans-serif" font-size="54" font-weight="900" fill="url(%23metal)" letter-spacing="4">銓展通訊</text><text x="95" y="92" font-family="'Arial Black', sans-serif" font-size="15" font-weight="bold" fill="%2364748b" letter-spacing="1.5">Quanzhan Communication</text></g></svg>`
+    };
+
+    const firebaseConfig = typeof window.__firebase_config !== 'undefined' ? JSON.parse(window.__firebase_config) : {};
+    const app = Object.keys(firebaseConfig).length > 0 ? initializeApp(firebaseConfig) : null;
+    const auth = app ? getAuth(app) : null;
+    const db = app ? getFirestore(app) : null;
+    const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : (typeof __app_id !== 'undefined' ? __app_id : 'quanzhan-gen-v1');
+
+    const companyInfo = {
+      name: "銓展通訊",
+      englishName: "Digital Communication",
+      slogan: "(銓心為你.展現服務)",
+      address: "桃園市龜山區中興路 402 號",
+      phone: "03-3590858",
+      taxId: "80089553",
+      since: 1989
+    };
+
+    const blankAnnotations = ["\u00A0", "\u00A0", "\u00A0"];
+
+    // --- 圖片素材 (靜態展示用) ---
+    const imgApplePhoneBase = "https://images.unsplash.com/photo-1678652197831-2d180705cd2c?auto=format&fit=crop&q=80&w=600"; 
+    const imgApplePhonePro = "https://images.unsplash.com/photo-1695048064906-81ec01c77fba?auto=format&fit=crop&q=80&w=600"; 
+    const imgApplePhoneAir = "https://images.unsplash.com/photo-1611791485440-24e8fcb959f9?auto=format&fit=crop&q=80&w=600"; 
+    const imgAppleTabletPro = "https://images.unsplash.com/photo-1585790050230-5dd28404ccb9?auto=format&fit=crop&q=80&w=600"; 
+    const imgAppleTabletAir = "https://images.unsplash.com/photo-1611532736597-de2d4265fba3?auto=format&fit=crop&q=80&w=600"; 
+    const imgAppleWatchUltra = "https://images.unsplash.com/photo-1698242491176-6953eefde21f?auto=format&fit=crop&q=80&w=600"; 
+    const imgAppleWatchBase = "https://images.unsplash.com/photo-1551816230-ef5ce3632273?auto=format&fit=crop&q=80&w=600"; 
+    const imgAppleAudioPro = "https://images.unsplash.com/photo-1606841836067-152e0086fb4a?auto=format&fit=crop&q=80&w=600"; 
+    const imgAppleAudioMax = "https://images.unsplash.com/photo-1613040809024-b4ef7ba99bc3?auto=format&fit=crop&q=80&w=600"; 
+    const imgSamsungPhone = "https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?auto=format&fit=crop&q=80&w=600";
+    const imgSamsungTablet = "https://images.unsplash.com/photo-1589739900266-43b2843f4c12?auto=format&fit=crop&q=80&w=600"; 
+    const imgAndroidPhone = "https://images.unsplash.com/photo-1598327105666-5b89351aff97?auto=format&fit=crop&q=80&w=600";
+    const imgAndroidTablet = "https://images.unsplash.com/photo-1589739900266-43b2843f4c12?auto=format&fit=crop&q=80&w=600";
+
+    // --- 前台商品資料庫 (63款 - 記憶體已整合至價格中，附註更名) ---
+    const frontendProducts = [
+      // ================= 蘋果 Apple 系列 =================
+      { id: 1, brand: "Apple", type: "phone", title: "iPhone 16", launch: "上市時間：2024年09月", features: ["搭載 6.1 吋高質感鋁金屬機身", "配備 4800 萬畫素超清晰主相機", "內建 A18 晶片釋放強大 AI 效能"], annotations: blankAnnotations, specs: { "商品尺寸": "6.1 吋", "材質": "鋁金屬", "後鏡頭": "4800萬", "前鏡頭": "1200萬", "電池容量": "3561 mAh", "銓展價": "8+128GB=25490元 / 8+256GB=28990元", "機身顏色": "湛海藍、湖水綠、粉紅色、白色、黑色", "PS (附註)": "" }, imageUrl: imgApplePhoneBase },
+      { id: 2, brand: "Apple", type: "phone", title: "iPhone 17", launch: "上市時間：2025年09月", features: ["6.3 吋鋁金屬搭配 120Hz 螢幕", "搭載 4800 萬畫素頂級雙鏡頭系統", "電池續航力大幅躍升至 30 小時"], annotations: blankAnnotations, specs: { "商品尺寸": "6.3 吋", "材質": "鋁金屬", "後鏡頭": "4800萬雙鏡", "前鏡頭": "1800萬", "電池容量": "30 小時續航", "銓展價": "8+256GB=26490元 / 8+512GB=32990元", "機身顏色": "霧藍色、薰衣草紫、鼠尾草綠、黑色、白色", "PS (附註)": "" }, imageUrl: imgApplePhoneBase },
+      { id: 3, brand: "Apple", type: "phone", title: "iPhone Air", launch: "上市時間：2025年09月", features: ["突破極限的 5.6mm 極致纖薄設計", "採用 6.6 吋航太級 5 級鈦金屬", "引領未來的全機純 eSIM 創新架構"], annotations: blankAnnotations, specs: { "商品尺寸": "6.6 吋", "材質": "5級鈦金屬", "後鏡頭": "4800萬", "前鏡頭": "1800萬", "電池容量": "27 小時續航", "銓展價": "8+256GB=32490元 / 8+512GB=38990元", "機身顏色": "天藍色、淺金色、太空黑、雲白色", "PS (附註)": "" }, imageUrl: imgApplePhoneAir },
+      { id: 4, brand: "Apple", type: "phone", title: "iPhone 17 Pro", launch: "上市時間：2025年09月", features: ["6.3 吋熱鍛造鋁合金散熱極佳", "搭載 4800 萬畫素專業級三鏡頭", "內建業界最頂尖的專業級散熱系統"], annotations: blankAnnotations, specs: { "商品尺寸": "6.3 吋", "材質": "熱鍛造鋁合金", "後鏡頭": "4800萬三鏡", "前鏡頭": "2400萬", "電池容量": "31 小時續航", "銓展價": "12+256GB=36290元 / 12+512GB=42990元 / 12+1TB=49490元", "機身顏色": "宇宙橙、藏藍色、銀色", "PS (附註)": "" }, imageUrl: imgApplePhonePro },
+      { id: 5, brand: "Apple", type: "phone", title: "iPhone 17 Pro Max", launch: "上市時間：2025年09月", features: ["6.9 吋熱鍛造鋁合金超大螢幕", "配備 4800 萬畫素頂級攝影三鏡", "提供高達 37 小時的極致長效續航"], annotations: blankAnnotations, specs: { "商品尺寸": "6.9 吋", "材質": "熱鍛造鋁合金", "後鏡頭": "4800萬三鏡", "前鏡頭": "2400萬", "電池容量": "37 小時續航", "銓展價": "12+256GB=40990元 / 12+512GB=47490元 / 12+1TB=53990元", "機身顏色": "宇宙橙、藏藍色、銀色", "PS (附註)": "" }, imageUrl: imgApplePhonePro },
+      { id: 6, brand: "Apple", type: "phone", title: "iPhone 16 Pro", launch: "上市時間：2024年09月", features: ["6.3 吋 5 級鈦金屬設計", "配備 4800 萬畫素超廣角相機", "內建 A18 Pro 晶片釋放強大 AI 效能"], annotations: blankAnnotations, specs: { "商品尺寸": "6.3 吋", "材質": "5級鈦金屬", "後鏡頭": "4800萬三鏡", "前鏡頭": "1200萬", "電池容量": "27 小時續航", "銓展價": "8+128GB=32490元 / 8+256GB=35990元", "機身顏色": "沙漠色鈦金屬、原色鈦金屬、白色鈦金屬、黑色鈦金屬", "PS (附註)": "" }, imageUrl: imgApplePhonePro },
+      { id: 7, brand: "Apple", type: "tablet", title: "iPad Pro 13 (M5)", launch: "上市時間：2025年10月", features: ["13 吋超擬真顯示器視覺極致震撼", "內建最新 M5 超強核心處理晶片", "具備專業級雙鏡頭配置與光學雷達"], annotations: blankAnnotations, specs: { "商品尺寸": "13 吋", "材質": "鋁金屬", "後鏡頭": "專業級雙鏡頭", "前鏡頭": "專業級雙鏡頭", "電池容量": "全天候續航", "銓展價": "8+256GB=42900元 / 8+512GB=49900元", "機身顏色": "銀色、太空黑色", "PS (附註)": "" }, imageUrl: imgAppleTabletPro },
+      { id: 8, brand: "Apple", type: "tablet", title: "iPad Pro 11 (M5)", launch: "上市時間：2025年10月", features: ["11 吋超擬真顯示器輕巧好攜帶", "展現極致輕薄機身設計的工藝美學", "專業工作者與頂尖創作者的最佳首選"], annotations: blankAnnotations, specs: { "商品尺寸": "11 吋", "材質": "鋁金屬", "後鏡頭": "專業級雙鏡頭", "前鏡頭": "專業級雙鏡頭", "電池容量": "全天候續航", "銓展價": "8+256GB=31900起", "機身顏色": "銀色、太空黑", "PS (附註)": "" }, imageUrl: imgAppleTabletPro },
+      { id: 9, brand: "Apple", type: "tablet", title: "iPad Air 13 (M3)", launch: "上市時間：2025年03月", features: ["13 吋高性價比大螢幕追劇最過癮", "搭載強大 M3 核心晶片效能升級", "配備 1200 萬畫素超廣角前置鏡頭"], annotations: blankAnnotations, specs: { "商品尺寸": "13 吋", "材質": "鋁金屬", "後鏡頭": "1200萬", "前鏡頭": "1200萬", "電池容量": "全天候續航", "銓展價": "8+128GB=23900元 / 8+256GB=26900元", "機身顏色": "藍色、紫色、星光色、太空灰", "PS (附註)": "" }, imageUrl: imgAppleTabletAir },
+      { id: 10, brand: "Apple", type: "tablet", title: "iPad Air 11 (M3)", launch: "上市時間：2025年03月", features: ["11 吋全螢幕設計帶來寬闊舒適視野", "效能與便攜性達到最完美的黃金平衡", "提供多種活潑色彩滿足您的個性選擇"], annotations: blankAnnotations, specs: { "商品尺寸": "11 吋", "材質": "鋁金屬", "後鏡頭": "1200萬", "前鏡頭": "1200萬", "電池容量": "全天候續航", "銓展價": "8+128GB=17490起", "機身顏色": "藍色、紫色、星光色、太空灰", "PS (附註)": "" }, imageUrl: imgAppleTabletAir },
+      { id: 11, brand: "Apple", type: "tablet", title: "iPad mini 7", launch: "上市時間：2024年10月", features: ["地表最強 8.3 吋輕巧便攜小平板", "內建強悍 A17 Pro 處理器核心晶片", "讓您單手就能輕鬆掌握的極致輕巧"], annotations: blankAnnotations, specs: { "商品尺寸": "8.3 吋", "材質": "鋁金屬", "後鏡頭": "1200萬", "前鏡頭": "1200萬", "電池容量": "全天候續航", "銓展價": "8+128GB=14900起", "機身顏色": "藍色、紫色、星光色、太空灰", "PS (附註)": "" }, imageUrl: imgAppleTabletAir },
+      { id: 12, brand: "Apple", type: "tablet", title: "iPad 11 (2025)", launch: "上市時間：2025年03月", features: ["學生族群與文書處理的入門必備神機", "配備 11 吋標準大螢幕舒適好閱讀", "預算有限下的超高性價比無敵首選"], annotations: blankAnnotations, specs: { "商品尺寸": "11 吋", "材質": "鋁金屬", "後鏡頭": "1200萬", "前鏡頭": "1200萬", "電池容量": "全天候續航", "銓展價": "8+128GB=9500起", "機身顏色": "黃色、藍色、粉紅色、銀色", "PS (附註)": "" }, imageUrl: imgAppleTabletAir },
+      { id: 13, brand: "Apple", type: "watch", title: "Apple Watch Ultra 3", launch: "上市時間：2025年09月", features: ["高達 3000 nits 最高亮度清晰可見", "採用極限原色鈦金屬打造堅固錶殼", "提供長達 42 小時的極致馬拉松續航"], annotations: blankAnnotations, specs: { "商品尺寸": "49mm", "材質": "鈦金屬", "後鏡頭": "無", "前鏡頭": "無", "電池容量": "42小時", "銓展價": "32GB=24900元", "機身顏色": "原色、黑色", "PS (附註)": "" }, imageUrl: imgAppleWatchUltra },
+      { id: 14, brand: "Apple", type: "watch", title: "Apple Watch S11", launch: "上市時間：2025年09月", features: ["採用全新世代的極致纖薄錶身設計", "升級至 2000 nits 超高亮度顯示器", "內建最先進的睡眠呼吸中止偵測功能"], annotations: blankAnnotations, specs: { "商品尺寸": "41mm / 45mm", "材質": "鋁金屬", "後鏡頭": "無", "前鏡頭": "無", "電池容量": "18小時", "銓展價": "32GB=11900起", "機身顏色": "曜石黑、玫瑰金、銀色", "PS (附註)": "" }, imageUrl: imgAppleWatchBase },
+      { id: 15, brand: "Apple", type: "watch", title: "Apple Watch SE 3", launch: "上市時間：2025年09月", features: ["平價高效能的智慧穿戴最佳入門首選", "內建具備精準判斷的安全跌倒偵測", "提供生命徵象全天候無死角健康監測"], annotations: blankAnnotations, specs: { "商品尺寸": "40mm / 44mm", "材質": "鋁金屬", "後鏡頭": "無", "前鏡頭": "無", "電池容量": "18小時", "銓展價": "32GB=6500起", "機身顏色": "午夜色、星光色、銀色", "PS (附註)": "" }, imageUrl: imgAppleWatchBase },
+      { id: 16, brand: "Apple", type: "audio", title: "AirPods Pro 3", launch: "上市時間：2025年09月", features: ["新一代主動降噪能力獲得雙倍震撼提升", "領先業界內建超精準心率感測功能", "具備 IP57 高等級防塵防水防護設計"], annotations: blankAnnotations, specs: { "商品尺寸": "依原廠公告", "材質": "IP57 防塵防水", "後鏡頭": "無", "前鏡頭": "無", "電池容量": "依充電盒", "銓展價": "標準版=6390元", "機身顏色": "白色", "PS (附註)": "" }, imageUrl: imgAppleAudioPro },
+      { id: 17, brand: "Apple", type: "audio", title: "AirPods Max 2", launch: "上市時間：2024年09月", features: ["提供錄音室等級的專業級主動降噪", "支援保真壓縮高音質無損細節傳輸", "推出全新五款令人驚豔的高質感新色"], annotations: blankAnnotations, specs: { "商品尺寸": "依原廠公告", "材質": "金屬編織", "後鏡頭": "無", "前鏡頭": "無", "電池容量": "長效聆聽", "銓展價": "標準版=15990元", "機身顏色": "午夜色、星光色、藍色、紫色、橙色", "PS (附註)": "" }, imageUrl: imgAppleAudioMax },
+      { id: 18, brand: "Apple", type: "audio", title: "AirPods 4 (降噪版)", launch: "上市時間：2024年09月", features: ["首度在標準版設計中加入主動降噪功能", "具備讓您清晰聽見外界聲音的通透模式", "支援精準尋找功能的全新無線充電盒"], annotations: blankAnnotations, specs: { "商品尺寸": "依原廠公告", "材質": "IP54 防塵防水", "後鏡頭": "無", "前鏡頭": "無", "電池容量": "依充電盒", "銓展價": "標準版=4990元", "機身顏色": "白色", "PS (附註)": "" }, imageUrl: imgAppleAudioPro },
+      { id: 19, brand: "Apple", type: "audio", title: "AirPods 4 (標準版)", launch: "上市時間：2024年09月", features: ["支援為您量身打造的個人化空間音訊", "採用全新語音隔離技術讓通話更清晰", "升級 IP54 防塵防水讓您運動更安心"], annotations: blankAnnotations, specs: { "商品尺寸": "依原廠公告", "材質": "IP54 防塵防水", "後鏡頭": "無", "前鏡頭": "無", "電池容量": "依充電盒", "銓展價": "標準版=3690元", "機身顏色": "白色", "PS (附註)": "" }, imageUrl: imgAppleAudioPro },
+
+      // ================= Samsung 系列 =================
+      { id: 20, brand: "Samsung", type: "phone", title: "Galaxy S25 Ultra", launch: "上市時間：2025年01月", features: ["搭載 6.9 吋極致堅固的鈦金屬邊框", "配備 2 億畫素頂級專業攝影主鏡頭", "機身內建智慧 S-Pen 隨時隨地紀錄"], annotations: blankAnnotations, specs: { "商品尺寸": "6.9 吋", "材質": "鈦金屬", "後鏡頭": "2億主相機", "前鏡頭": "1200萬", "電池容量": "5000 mAh", "銓展價": "12+256GB=34990元 / 12+512GB=38990元", "機身顏色": "鈦空藍、鈦銀、鈦黑", "PS (附註)": "" }, imageUrl: imgSamsungPhone },
+      { id: 21, brand: "Samsung", type: "phone", title: "Galaxy S25 Edge", launch: "上市時間：2025年01月", features: ["引領潮流的全新極致纖薄美學設計", "採用 6.5 吋高質感拋光鋁金屬機身", "配備 5000 萬畫素頂級超清三鏡頭"], annotations: blankAnnotations, specs: { "商品尺寸": "6.5 吋", "材質": "拋光鋁金屬", "後鏡頭": "5000萬三鏡", "前鏡頭": "1200萬", "電池容量": "3150 mAh", "銓展價": "12+256GB=24990元", "機身顏色": "鈦輕藍、鈦輕黑", "PS (附註)": "" }, imageUrl: imgSamsungPhone },
+      { id: 22, brand: "Samsung", type: "phone", title: "Galaxy S25+", launch: "上市時間：2025年01月", features: ["擁有 6.7 吋頂級智慧動態大螢幕", "配備 4900 mAh 大電量長效續航", "搭載 5000 萬畫素智慧攝影相機"], annotations: blankAnnotations, specs: { "商品尺寸": "6.7 吋", "材質": "強化玻璃", "後鏡頭": "5000萬三鏡", "前鏡頭": "1200萬", "電池容量": "4900 mAh", "銓展價": "12+256GB=26990元", "機身顏色": "深海藍、冰藍、炫灰、迷綠", "PS (附註)": "" }, imageUrl: imgSamsungPhone },
+      { id: 23, brand: "Samsung", type: "phone", title: "Galaxy S25", launch: "上市時間：2025年01月", features: ["6.2 吋黃金比例讓您單手輕鬆好掌握", "配備 5000 萬畫素旗艦級清晰相機", "享受頂級智慧效能的輕巧旗艦首選"], annotations: blankAnnotations, specs: { "商品尺寸": "6.2 吋", "材質": "強化玻璃", "後鏡頭": "5000萬三鏡", "前鏡頭": "1200萬", "電池容量": "4000 mAh", "銓展價": "12+256GB=21490元", "機身顏色": "深海藍、冰藍、炫灰、迷綠", "PS (附註)": "" }, imageUrl: imgSamsungPhone },
+      { id: 24, brand: "Samsung", type: "phone", title: "Galaxy Z Fold7", launch: "上市時間：2025年07月", features: ["展開高達 7.6 吋的極致震撼大摺疊", "配備 2 億畫素頂尖無敵攝影主相機", "採用全新升級的超耐用鈦金屬隱形轉軸"], annotations: blankAnnotations, specs: { "商品尺寸": "7.6 吋", "材質": "鈦金屬", "後鏡頭": "2億+1200萬", "前鏡頭": "1000萬", "電池容量": "4400 mAh", "銓展價": "12+512GB=48990元", "機身顏色": "海影藍、墨夜黑", "PS (附註)": "" }, imageUrl: imgSamsungPhone },
+      { id: 25, brand: "Samsung", type: "phone", title: "Galaxy Z Flip7", launch: "上市時間：2025年07月", features: ["展現個人風格的時尚貝殼摺疊設計", "展開即擁有 6.7 吋超流暢寬闊大螢幕", "搭載 5000 萬畫素高畫質完美拍攝鏡頭"], annotations: blankAnnotations, specs: { "商品尺寸": "6.7 吋", "材質": "鋁金屬", "後鏡頭": "5000萬雙鏡", "前鏡頭": "1000萬", "電池容量": "4300 mAh", "銓展價": "12+256GB=24990元", "機身顏色": "海影藍、輕緋紅", "PS (附註)": "" }, imageUrl: imgSamsungPhone },
+      { id: 26, brand: "Samsung", type: "phone", title: "Galaxy A56", launch: "上市時間：2025年03月", features: ["市場唯一高性價比最強防水國民神機", "配備 6.7 吋鋁金屬邊框超大顯示螢幕", "搭載 5000 萬畫素超清晰美拍三鏡頭"], annotations: blankAnnotations, specs: { "商品尺寸": "6.7 吋", "材質": "鋁金屬框架", "後鏡頭": "5000萬三鏡", "前鏡頭": "1200萬", "電池容量": "5000 mAh", "銓展價": "8+256GB=10490元", "機身顏色": "夜遊黑、賞櫻粉、鐵馬灰、野營綠", "PS (附註)": "" }, imageUrl: imgSamsungPhone },
+      { id: 27, brand: "Samsung", type: "phone", title: "Galaxy A36", launch: "上市時間：2025年03月", features: ["擁有 6.6 吋大螢幕帶來極致視覺饗宴", "全方位功能兼具的中階智慧購機首選", "內建 5000 mAh 超大容量超長效續航"], annotations: blankAnnotations, specs: { "商品尺寸": "6.6 吋", "材質": "強化玻璃", "後鏡頭": "5000萬三鏡", "前鏡頭": "1200萬", "電池容量": "5000 mAh", "銓展價": "8+128GB=8490元", "機身顏色": "秘境黑、夜光紫、滑雪白、極光綠", "PS (附註)": "" }, imageUrl: imgSamsungPhone },
+      { id: 28, brand: "Samsung", type: "phone", title: "Galaxy A26", launch: "上市時間：2025年12月", features: ["提供極致流暢操作體驗的最佳平價選擇", "搭載 5000 萬畫素智慧高解析度相機", "配備 5000 mAh 大電量讓您整天不斷電"], annotations: blankAnnotations, specs: { "商品尺寸": "6.6 吋", "材質": "強化塑膠", "後鏡頭": "5000萬三鏡", "前鏡頭": "1300萬", "電池容量": "5000 mAh", "銓展價": "8+128GB=6590元", "機身顏色": "深潛黑、浪花白、度假綠", "PS (附註)": "" }, imageUrl: imgSamsungPhone },
+      { id: 29, brand: "Samsung", type: "phone", title: "Galaxy A17", launch: "上市時間：2025年08月", features: ["體驗高速網路的超值 5G 入門最佳選購", "具備 6.7 吋寬闊大螢幕追劇看片最舒適", "配備 5000 萬畫素超清晰主攝影鏡頭"], annotations: blankAnnotations, specs: { "商品尺寸": "6.7 吋", "材質": "強化塑膠", "後鏡頭": "5000萬三鏡", "前鏡頭": "1300萬", "電池容量": "5000 mAh", "銓展價": "6+128GB=4590元", "機身顏色": "黑色、白色、淺藍", "PS (附註)": "" }, imageUrl: imgSamsungPhone },
+      { id: 30, brand: "Samsung", type: "phone", title: "Galaxy A07", launch: "上市時間：2026年02月", features: ["導入最新平價動態島創新互動設計", "擁有 6.7 吋沉浸式視覺饗宴大螢幕", "配備高解析度雙鏡頭 5000 萬畫素相機"], annotations: blankAnnotations, specs: { "商品尺寸": "6.7 吋", "材質": "強化塑膠", "後鏡頭": "5000萬雙鏡", "前鏡頭": "800萬", "電池容量": "5000 mAh", "銓展價": "4+128GB=3590元", "機身顏色": "酷潮黑、裸光紫", "PS (附註)": "" }, imageUrl: imgSamsungPhone },
+      { id: 31, brand: "Samsung", type: "tablet", title: "Galaxy Tab S11 Ultra", launch: "上市時間：2025年10月", features: ["具備 14.6 吋頂級超大螢幕視覺震撼", "支援頂尖 AI 輔助與專業數位筆記首選", "採用極致輕薄且堅固的鋁金屬機身"], annotations: blankAnnotations, specs: { "商品尺寸": "14.6 吋", "材質": "鋁金屬", "後鏡頭": "1300萬+800萬", "前鏡頭": "雙1200萬", "電池容量": "大容量", "銓展價": "12+256GB=36900起", "機身顏色": "月石灰", "PS (附註)": "" }, imageUrl: imgSamsungTablet },
+      { id: 32, brand: "Samsung", type: "tablet", title: "Galaxy Tab S11+", launch: "上市時間：2025年10月", features: ["搭載 12.4 吋色彩細緻動人的顯示螢幕", "隨盒附贈專屬高靈敏度 S Pen 觸控筆", "滿足您所有需求的高效能影音娛樂旗艦"], annotations: blankAnnotations, specs: { "商品尺寸": "12.4 吋", "材質": "鋁金屬", "後鏡頭": "1300萬", "前鏡頭": "1200萬", "電池容量": "大容量電池", "銓展價": "12+256GB=27900元", "機身顏色": "月石灰、鉑金銀", "PS (附註)": "" }, imageUrl: imgSamsungTablet },
+      { id: 33, brand: "Samsung", type: "tablet", title: "Galaxy Tab S10 Lite", launch: "上市時間：2025年08月", features: ["兼顧效能與預算的高性價比輕旗艦平板", "配備 10.9 吋長時間使用也舒適的護眼螢幕", "機身具備日常非常實用的防水防塵功能"], annotations: blankAnnotations, specs: { "商品尺寸": "10.9 吋", "材質": "鋁金屬", "後鏡頭": "800萬", "前鏡頭": "500萬", "電池容量": "大容量", "銓展價": "8+128GB=10500元", "機身顏色": "酷玩灰、潮炫銀、出色紅", "PS (附註)": "" }, imageUrl: imgSamsungTablet },
+      { id: 34, brand: "Samsung", type: "tablet", title: "Galaxy Tab A11+", launch: "上市時間：2026年01月", features: ["大受市場歡迎的最新國民級超大平板", "擁有 11 吋劇院級極致視覺享受大螢幕", "配置針對橫向視訊會議最佳化的前鏡頭"], annotations: blankAnnotations, specs: { "商品尺寸": "11 吋", "材質": "強化塑膠", "後鏡頭": "800萬", "前鏡頭": "500萬 (橫向)", "電池容量": "標準電池", "銓展價": "8+128GB=6990元", "機身顏色": "星空灰、星際銀", "PS (附註)": "" }, imageUrl: imgSamsungTablet },
+      { id: 35, brand: "Samsung", type: "tablet", title: "Galaxy Tab A11", launch: "上市時間：2026年01月", features: ["操作流暢不卡頓的超值入門學習平板", "配備 11 吋標準清晰亮麗的顯示大螢幕", "學生線上學習與長輩日常追劇的最佳首選"], annotations: blankAnnotations, specs: { "商品尺寸": "11 吋", "材質": "強化塑膠", "後鏡頭": "800萬", "前鏡頭": "500萬", "電池容量": "標準電池", "銓展價": "4+128GB=5290元", "機身顏色": "星空灰、星際銀", "PS (附註)": "" }, imageUrl: imgSamsungTablet },
+
+      // ================= OPPO 系列 =================
+      { id: 36, brand: "OPPO", type: "phone", title: "Find X9 Pro", launch: "上市時間：2025年11月", features: ["展現極致影像的年度旗艦頂級拍照機", "搭載殿堂級哈蘇專業色彩影像系統", "配備 2 億畫素超強長焦與 7500 mAh 大電池"], annotations: blankAnnotations, specs: { "商品尺寸": "6.8 吋", "材質": "玻璃", "後鏡頭": "5000萬三鏡", "前鏡頭": "3200萬", "電池容量": "7500 mAh", "銓展價": "16+512GB=31990元 / 16+1TB=35990元", "機身顏色": "霜白、絨砂鈦、追光紅", "PS (附註)": "" }, imageUrl: imgAndroidPhone },
+      { id: 37, brand: "OPPO", type: "phone", title: "Find X9", launch: "上市時間：2025年11月", features: ["內建哈蘇專業認證的長焦超清晰鏡頭", "採用 6.78 吋極窄邊框打造無界視野", "配備 7025 mAh 超大電量告別電量焦慮"], annotations: blankAnnotations, specs: { "商品尺寸": "6.78 吋", "材質": "極窄邊框", "後鏡頭": "5000萬三鏡", "前鏡頭": "3200萬", "電池容量": "7025 mAh", "銓展價": "12+256GB=22990元", "機身顏色": "霜白、絨砂鈦、追光紅", "PS (附註)": "" }, imageUrl: imgAndroidPhone },
+      { id: 38, brand: "OPPO", type: "phone", title: "Reno15 Pro Max", launch: "上市時間：2025年12月", features: ["搭載 2 億畫素超清晰高解析度主鏡頭", "全面支援 4K 超高動態錄影旗艦規格", "機身採用 6.8 吋航太級金屬質感邊框"], annotations: blankAnnotations, specs: { "商品尺寸": "6.8 吋", "材質": "航太級金屬", "後鏡頭": "2億+5000萬", "前鏡頭": "5000萬", "電池容量": "6500 mAh", "銓展價": "12+512GB=19500元", "機身顏色": "暮光金、夜漠棕", "PS (附註)": "" }, imageUrl: imgAndroidPhone },
+      { id: 39, brand: "OPPO", type: "phone", title: "Reno15 Pro", launch: "上市時間：2025年12月", features: ["地表最強的人像拍攝專家與美顏神器", "打造極致完美手感的輕巧型旗艦機", "背蓋採用獨特工藝的冷雕玻璃藝術設計"], annotations: blankAnnotations, specs: { "商品尺寸": "6.7 吋", "材質": "冷雕玻璃", "後鏡頭": "2億+5000萬", "前鏡頭": "5000萬", "電池容量": "6200 mAh", "銓展價": "12+256GB=15500元", "機身顏色": "極光藍、夜漠棕", "PS (附註)": "" }, imageUrl: imgAndroidPhone },
+      { id: 40, brand: "OPPO", type: "phone", title: "Reno15", launch: "上市時間：2025年12月", features: ["引領年輕世代潮流的時尚外觀美學設計", "內建強大的 AI 通話即時語音翻譯功能", "配備兩顆 5000 萬畫素的頂級攝影鏡頭"], annotations: blankAnnotations, specs: { "商品尺寸": "6.7 吋", "材質": "AMOLED", "後鏡頭": "5000萬三鏡", "前鏡頭": "5000萬", "電池容量": "6500 mAh", "銓展價": "12+256GB=12500元", "機身顏色": "極光白、蒼穹藍", "PS (附註)": "" }, imageUrl: imgAndroidPhone },
+      { id: 41, brand: "OPPO", type: "phone", title: "Reno15 F", launch: "上市時間：2026年01月", features: ["極致輕量化機身同時具備實用防水功能", "前置相機 AI 自拍演算法全面進化升級", "搭載 6.7 吋高強度強化防摔超大螢幕"], annotations: blankAnnotations, specs: { "商品尺寸": "6.7 吋", "材質": "強化玻璃", "後鏡頭": "5000萬三鏡", "前鏡頭": "5000萬", "電池容量": "5000 mAh", "銓展價": "8+256GB=8500元", "機身顏色": "極光藍、蒼穹藍", "PS (附註)": "" }, imageUrl: imgAndroidPhone },
+      { id: 42, brand: "OPPO", type: "phone", title: "A6s 5G", launch: "上市時間：2026年02月", features: ["內建 7000 mAh 挑戰市場最大電量極限", "提供三天免充電的極致超長續航王者體驗", "配備 5000 萬畫素超高畫質清晰雙鏡頭"], annotations: blankAnnotations, specs: { "商品尺寸": "6.7 吋", "材質": "強化塑膠", "後鏡頭": "5000萬雙鏡", "前鏡頭": "1600萬", "電池容量": "7000 mAh", "銓展價": "8+256GB=5990元", "機身顏色": "奶霜白、可可棕", "PS (附註)": "" }, imageUrl: imgAndroidPhone },
+      { id: 43, brand: "OPPO", type: "phone", title: "A6x 5G", launch: "上市時間：2026年01月", features: ["價格最親民的國民入門最佳無負擔首選", "結合大螢幕視覺享受與大電量持久續航", "搭載 5000 萬畫素捕捉生活細節的清晰鏡頭"], annotations: blankAnnotations, specs: { "商品尺寸": "6.5 吋", "材質": "強化塑膠", "後鏡頭": "5000萬雙鏡", "前鏡頭": "800萬", "電池容量": "6500 mAh", "銓展價": "4+128GB=4500元", "機身顏色": "芋泥紫、莓果紫", "PS (附註)": "" }, imageUrl: imgAndroidPhone },
+      { id: 44, brand: "OPPO", type: "tablet", title: "OPPO Pad SE", launch: "上市時間：2025年06月", features: ["通過低藍光認證的護眼全能入門級平板", "配備 1 吋寬闊大螢幕讓閱讀更加舒適", "機身輕巧便攜且具備極致超高性價比"], annotations: blankAnnotations, specs: { "商品尺寸": "11 吋", "材質": "護眼螢幕", "後鏡頭": "800萬", "前鏡頭": "500萬", "電池容量": "長效電池", "銓展價": "4+128GB=4500元", "機身顏色": "霧灰綠、太空灰", "PS (附註)": "" }, imageUrl: imgAndroidTablet },
+
+      // ================= vivo 系列 =================
+      { id: 45, brand: "vivo", type: "phone", title: "vivo X Fold5", launch: "上市時間：2025年08月", features: ["展開即享受頂級 8.03 吋震撼超大摺疊螢幕", "採用航太級碳纖維隱形轉軸頂尖工藝", "搭載 5000 萬畫素頂級蔡司認證三鏡頭"], annotations: blankAnnotations, specs: { "商品尺寸": "8.03 吋", "材質": "碳纖維轉軸", "後鏡頭": "5000萬三鏡", "前鏡頭": "2000萬", "電池容量": "6000 mAh", "銓展價": "16+512GB=44990元", "機身顏色": "鈦灰、羽白、青松", "PS (附註)": "" }, imageUrl: imgAndroidPhone },
+      { id: 46, brand: "vivo", type: "phone", title: "vivo X300 Pro", launch: "上市時間：2025年11月", features: ["為攝影而生的專業極致影像攝影旗艦機", "搭載雙 5000 萬加 2 億畫素極致變焦相機", "內建 6050 mAh 大電量維持長效驚人續航"], annotations: blankAnnotations, specs: { "商品尺寸": "6.78 吋", "材質": "鋁合金框架", "後鏡頭": "5000萬+2億", "前鏡頭": "5000萬", "電池容量": "6050 mAh", "銓展價": "16+512GB=30990元 / 16+1TB=34990元", "機身顏色": "沙漠棕、星辰黑", "PS (附註)": "" }, imageUrl: imgAndroidPhone },
+      { id: 47, brand: "vivo", type: "phone", title: "vivo X300", launch: "上市時間：2025年11月", features: ["滿足全方位場景的全能影像紀錄拍攝神器", "配備 2 億畫素超清晰高解析度主相機", "機身採用鋁合金框架搭配高質感美學設計"], annotations: blankAnnotations, specs: { "商品尺寸": "6.78 吋", "材質": "鋁合金框架", "後鏡頭": "2億+5000萬", "前鏡頭": "5000萬", "電池容量": "6040 mAh", "銓展價": "12+256GB=23500元", "機身顏色": "晨曦粉、山嵐紫、晴空藍、星辰黑", "PS (附註)": "" }, imageUrl: imgAndroidPhone },
+      { id: 48, brand: "vivo", type: "phone", title: "vivo X200 FE", launch: "上市時間：2025年12月", features: ["追求完美手感的輕薄旗艦機款最佳首選", "搭載 5000 萬畫素無死角完美變焦三鏡頭", "內建 6500 mAh 超大容量電池極致續航"], annotations: blankAnnotations, specs: { "商品尺寸": "6.7 吋", "材質": "強化玻璃", "後鏡頭": "5000萬三鏡", "前鏡頭": "5000萬", "電池容量": "6500 mAh", "銓展價": "12+512GB=16900元", "機身顏色": "鈦灰、辰夜黑", "PS (附註)": "" }, imageUrl: imgAndroidPhone },
+      { id: 49, brand: "vivo", type: "phone", title: "vivo V60", launch: "上市時間：2025年09月", features: ["擁有蔡司光學認證的最強中階美拍神機", "前置 5000 萬畫素打造頂級完美清晰自拍", "後置雙 5000 萬畫素強大相機模組系統"], annotations: blankAnnotations, specs: { "商品尺寸": "6.7 吋", "材質": "強化玻璃", "後鏡頭": "5000萬三鏡", "前鏡頭": "5000萬", "電池容量": "6500 mAh", "銓展價": "12+512GB=12990元", "機身顏色": "甜莓紫、空靈灰", "PS (附註)": "" }, imageUrl: imgAndroidPhone },
+      { id: 50, brand: "vivo", type: "phone", title: "vivo V60 Lite", launch: "上市時間：2025年09月", features: ["挑戰萬元以內價格最強的人像拍攝手機", "前置 3200 萬畫素讓您的自拍永遠清晰", "搭載 5000 萬畫素主相機模組捕捉美好瞬間"], annotations: blankAnnotations, specs: { "商品尺寸": "6.6 吋", "材質": "強化塑膠", "後鏡頭": "5000萬雙鏡", "前鏡頭": "3200萬", "電池容量": "6500 mAh", "銓展價": "12+256GB=8990元", "機身顏色": "元氣粉、鈦霧藍、曜夜黑", "PS (附註)": "" }, imageUrl: imgAndroidPhone },
+      { id: 51, brand: "vivo", type: "phone", title: "vivo Y39", launch: "上市時間：2025年03月", features: ["內建 6500 mAh 超大電量告別充電煩惱", "挑戰極致長效續航的超強平價國民神機", "配備 5000 萬畫素主鏡相機紀錄生活點滴"], annotations: blankAnnotations, specs: { "商品尺寸": "6.6 吋", "材質": "強化塑膠", "後鏡頭": "5000萬雙鏡", "前鏡頭": "800萬", "電池容量": "6500 mAh", "銓展價": "8+256GB=6500元", "機身顏色": "山海青、銀河紫", "PS (附註)": "" }, imageUrl: imgAndroidPhone },
+      { id: 52, brand: "vivo", type: "phone", title: "vivo Y29s", launch: "上市時間：2025年04月", features: ["輕鬆體驗高速網路的 5G 通訊入門大推薦", "搭載 5000 萬畫素高畫質拍攝完美鏡頭", "內建 5500 mAh 大電池提供整日超長續航"], annotations: blankAnnotations, specs: { "商品尺寸": "6.5 吋", "材質": "強化塑膠", "後鏡頭": "5000萬雙鏡", "前鏡頭": "500萬", "電池容量": "5500 mAh", "銓展價": "8+128GB=4990元", "機身顏色": "白銀、青銅", "PS (附註)": "" }, imageUrl: imgAndroidPhone },
+      { id: 53, brand: "vivo", type: "phone", title: "vivo Y04", launch: "上市時間：2026年02月", features: ["最新強勢上市的極致平價國民神機代表", "配備 6.74 吋大視覺螢幕帶來舒適觀影體驗", "內建 5500 mAh 實用大電量滿足日常需求"], annotations: blankAnnotations, specs: { "商品尺寸": "6.74 吋", "材質": "強化塑膠", "後鏡頭": "1300萬", "前鏡頭": "500萬", "電池容量": "5500 mAh", "銓展價": "4+128GB=3200元", "機身顏色": "黑色、白色", "PS (附註)": "" }, imageUrl: imgAndroidPhone },
+
+      // ================= 小米 Xiaomi 系列 =================
+      { id: 54, brand: "小米", type: "phone", title: "Xiaomi 15 Ultra", launch: "上市時間：2025年11月", features: ["搭載徠卡專業光學影像與 1 吋超大感光底", "支援高達 120 倍數位變焦捕捉極致遠景", "採用 2K 超高畫質螢幕與 6000 mAh 強大電池"], annotations: blankAnnotations, specs: { "商品尺寸": "6.7 吋", "材質": "龍晶玻璃", "後鏡頭": "5000萬四鏡頭", "前鏡頭": "3200萬", "電池容量": "6000 mAh", "銓展價": "16+512GB=28500元", "機身顏色": "尊爵黑、科技銀", "PS (附註)": "" }, imageUrl: imgAndroidPhone },
+      { id: 55, brand: "小米", type: "phone", title: "Xiaomi 15", launch: "上市時間：2025年11月", features: ["搭載徠卡光學認證的頂級高畫質三鏡頭", "6.36 吋完美尺寸打造極致小手感旗艦機", "全面搭載最新研發的澎湃作業系統生態"], annotations: blankAnnotations, specs: { "商品尺寸": "6.36 吋", "材質": "鋁合金中框", "後鏡頭": "5000萬三鏡頭", "前鏡頭": "3200萬", "電池容量": "5400 mAh", "銓展價": "12+256GB=19500元", "機身顏色": "經典黑、純潔白、薄荷綠", "PS (附註)": "" }, imageUrl: imgAndroidPhone },
+      { id: 56, brand: "小米", type: "phone", title: "Xiaomi 15T Pro", launch: "上市時間：2025年09月", features: ["支援 120W 極速閃電快充讓手機瞬間滿血", "擁有徠卡認證的原生雙畫質頂尖攝影能力", "具備 IP68 最高等級防塵防水防護機身設計"], annotations: blankAnnotations, specs: { "商品尺寸": "6.67 吋", "材質": "IP68 防水材質", "後鏡頭": "5000萬三鏡頭", "前鏡頭": "3200萬", "電池容量": "5500 mAh", "銓展價": "12+512GB=15500元", "機身顏色": "黑、藍", "PS (附註)": "" }, imageUrl: imgAndroidPhone },
+      { id: 57, brand: "小米", type: "phone", title: "Redmi Note 15 Pro+", launch: "上市時間：2026年01月", features: ["搭載 2.1 億畫素超高解析度畫質主攝影鏡頭", "身為中階性能王者更支援 100W 極速快充", "採用頂級金剛防護機身架構挑戰最抗摔"], annotations: blankAnnotations, specs: { "商品尺寸": "6.67 吋", "材質": "金剛防摔架構", "後鏡頭": "2.1億+5000萬", "前鏡頭": "3200萬", "電池容量": "6500 mAh", "銓展價": "12+256GB=10500元 / 12+512GB=12500元", "機身顏色": "黑、紫、白", "PS (附註)": "" }, imageUrl: imgAndroidPhone },
+      { id: 58, brand: "小米", type: "phone", title: "Redmi Note 15 Pro", launch: "上市時間：2026年01月", features: ["萬元預算以內就能擁有的 2 億畫素神機首選", "螢幕具備 144Hz 超高更新率滑動極致流暢", "內建智慧成片與強大 AI 輔助剪輯影音功能"], annotations: blankAnnotations, specs: { "商品尺寸": "6.67 吋", "材質": "強化玻璃", "後鏡頭": "2億主相機", "前鏡頭": "2000萬", "電池容量": "6580 mAh", "銓展價": "12+256GB=8500元", "機身顏色": "黑、藍", "PS (附註)": "" }, imageUrl: imgAndroidPhone },
+      { id: 59, brand: "小米", type: "phone", title: "Redmi 15C", launch: "上市時間：2025年11月", features: ["內建 6000 mAh 超長效續航的實用入門神機", "支援高達 200% 超大音量輸出在戶外也清晰", "具備 33W 實用快速充電讓您迅速補充電力"], annotations: blankAnnotations, specs: { "商品尺寸": "6.7 吋", "材質": "強化塑膠材質", "後鏡頭": "5000萬主鏡頭", "前鏡頭": "800萬", "電池容量": "6000 mAh", "銓展價": "4+128GB=3200元", "機身顏色": "黑、綠", "PS (附註)": "" }, imageUrl: imgAndroidPhone },
+      { id: 60, brand: "小米", type: "tablet", title: "小米 Pad 7", launch: "上市時間：2025年11月", features: ["配備 1 吋超清晰 3.2K 護眼高畫質顯示器", "提供全新類桌機多視窗操作體驗大幅提升效率", "搭載 1300 萬畫素清晰鏡頭滿足視訊會議需求"], annotations: blankAnnotations, specs: { "商品尺寸": "11 吋", "材質": "金屬", "後鏡頭": "1300萬", "前鏡頭": "1300萬", "電池容量": "大容量", "銓展價": "8+256GB=8900元", "機身顏色": "灰、藍", "PS (附註)": "" }, imageUrl: imgAndroidTablet },
+      { id: 61, brand: "小米", type: "tablet", title: "紅米 Pad 2 Pro", launch: "上市時間：2025年12月", features: ["擁有 12.1 吋極致寬闊大螢幕帶來無邊際視野", "提供追劇與遊戲娛樂的極致順暢無卡頓體驗", "市場上高性價比娛樂首選的超值大螢幕平板"], annotations: blankAnnotations, specs: { "商品尺寸": "12.1 吋", "材質": "防護材質", "後鏡頭": "800萬", "前鏡頭": "800萬", "電池容量": "大容量電池", "銓展價": "8+256GB=7200元", "機身顏色": "深灰、薄荷綠", "PS (附註)": "" }, imageUrl: imgAndroidTablet },
+      { id: 62, brand: "小米", type: "tablet", title: "紅米 Pad 2", launch: "上市時間：2025年12月", features: ["採用高強度且極具耐用性的金屬質感機身設計", "配備 11 吋全螢幕提供極度舒適的廣闊視覺視野", "搭載 800 萬畫素實用相機滿足日常掃描與紀錄"], annotations: blankAnnotations, specs: { "商品尺寸": "11 吋", "材質": "金屬機身", "後鏡頭": "800萬", "前鏡頭": "800萬", "電池容量": "大容量", "銓展價": "8+128GB=4500元", "機身顏色": "灰、綠", "PS (附註)": "" }, imageUrl: imgAndroidTablet },
+      { id: 63, brand: "小米", type: "tablet", title: "紅米 Pad SE 8.7", launch: "上市時間：2025年08月", features: ["8.7 吋輕巧機身設計讓您單手就能輕鬆一手掌握", "隨身便攜追劇與閱讀電子書的最佳輕量化首選", "價格毫無負擔的極致平價國民級娛樂小平板"], annotations: blankAnnotations, specs: { "商品尺寸": "8.7 吋", "材質": "強化塑膠", "後鏡頭": "800萬", "前鏡頭": "500萬", "電池容量": "適中容量", "銓展價": "4+128GB=2800元", "機身顏色": "灰、藍", "PS (附註)": "" }, imageUrl: imgAndroidTablet }
+    ];
+
+    const brandCategories = [
+      { name: 'Apple', label: 'Apple' },
+      { name: 'Samsung', label: 'Samsung' },
+      { name: 'OPPO', label: 'OPPO' },
+      { name: 'vivo', label: 'vivo' },
+      { name: '小米', label: '小米' }
+    ];
+
+    const typeCategories = [
+      { name: '平板', label: '平板' },
+      { name: '手錶/配件', label: '手錶/配件' }
+    ];
+
+    // ==========================================
+    // 共用輔助函式 (Hoisted Functions 解決 ReferenceError)
+    // ==========================================
+    function checkIsNew(launchStr) {
+      if(!launchStr) return false;
+      const match = launchStr.match(/(\d{4})年(\d{2})月/);
+      if (!match) return false;
+      const launchYear = parseInt(match[1], 10);
+      const launchMonth = parseInt(match[2], 10);
+      const launchDate = new Date(launchYear, launchMonth - 1, 1);
+      const currentDate = new Date(); 
+      const diffMonths = (currentDate.getFullYear() - launchDate.getFullYear()) * 12 + (currentDate.getMonth() - launchDate.getMonth());
+      return diffMonths >= -3 && diffMonths <= 3;
+    }
+
+    function getDeviceTemplate(name) {
+      if (!name) return 'iphone-std';
+      const lowerName = name.toLowerCase();
+      if (lowerName.includes('ultra')) return 'samsung-ultra';
+      if (lowerName.includes('samsung') || lowerName.includes('galaxy') || lowerName.includes('s2')) return 'samsung-std';
+      if (lowerName.includes('pro') || lowerName.includes('max')) return 'iphone-pro';
+      return 'iphone-std';
+    }
+
+    function getBrandTheme(brand) {
+      switch(brand) {
+          case 'Apple': return { bg: '#121619', text: '#FFFFFF', frame: 'rgba(255,255,255,0.15)', bgText: 'rgba(255,255,255,0.03)' };
+          case 'Samsung': return { bg: '#034EA2', text: '#FFFFFF', frame: 'rgba(255,255,255,0.15)', bgText: 'rgba(255,255,255,0.05)' };
+          case 'OPPO': return { bg: '#009A65', text: '#FFFFFF', frame: 'rgba(255,255,255,0.15)', bgText: 'rgba(255,255,255,0.05)' };
+          case 'vivo': return { bg: '#415FFF', text: '#FFFFFF', frame: 'rgba(255,255,255,0.15)', bgText: 'rgba(255,255,255,0.05)' };
+          case '小米': return { bg: '#E65100', text: '#FFFFFF', frame: 'rgba(255,255,255,0.2)', bgText: 'rgba(255,255,255,0.08)' }; 
+          default: return { bg: '#1E293B', text: '#FFFFFF', frame: 'rgba(255,255,255,0.15)', bgText: 'rgba(255,255,255,0.03)' };
+      }
+    }
+
+    // ==========================================
+    // ? 核心升級：自動將 8+128GB=20000 加上錢字號與千分位
+    // ==========================================
+    function formatCombinedPrice(str) {
+      if (!str) return '';
+      let pStr = String(str).trim();
+      if (!pStr.includes('=')) return pStr; 
+
+      let parts = pStr.split('=');
+      let mem = parts[0].trim();
+      let pricePart = parts[1].replace(/元/g, '').replace(/\$/g, '').replace(/,/g, '').trim();
+      
+      let isQi = pricePart.endsWith('起');
+      if (isQi) pricePart = pricePart.slice(0, -1);
+
+      let numericPrice = Number(pricePart);
+      let formattedPrice = isNaN(numericPrice) ? pricePart : numericPrice.toLocaleString();
+
+      return `${mem} = $${formattedPrice}元${isQi ? '起' : ''}`;
+    }
+
+    // ==========================================
+    // 3. 視覺組件設計 (Hoisted Functions)
+    // ==========================================
+    function RealTimeStatus() {
+      const [time, setTime] = useState(new Date());
+      useEffect(() => {
+        const timer = setInterval(() => setTime(new Date()), 1000);
+        return () => clearInterval(timer);
+      }, []);
+      
+      const y = time.getFullYear();
+      const m = String(time.getMonth() + 1).padStart(2, '0');
+      const d = String(time.getDate()).padStart(2, '0');
+      const h = String(time.getHours()).padStart(2, '0');
+      const min = String(time.getMinutes()).padStart(2, '0');
+      const s = String(time.getSeconds()).padStart(2, '0');
+
+      return (
+        <div className="flex items-center gap-2 text-[10px] md:text-xs font-bold bg-black/20 px-3 py-1.5 rounded-full border border-white/20 shadow-inner text-white backdrop-blur-md">
+          <span className="relative flex h-2 w-2 md:h-3 md:w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 md:h-3 md:w-3 bg-green-500"></span>
+          </span>
+          <span className="font-mono tracking-widest">{`${y}-${m}-${d} ${h}:${min}:${s}`}</span>
+          <span className="hidden md:inline ml-1 text-green-300">系統連線中</span>
+        </div>
+      );
+    }
+
+    function DynamicBlueprint({ title, type }) {
+      const mainColor = "#1e293b";
+      const goldColor = "#E4C271";
+      const t = (title || "").toLowerCase();
+      const isPro = t.includes('pro') || t.includes('ultra') || t.includes('max');
+
+      return (
+          <svg viewBox="0 0 120 120" className="w-full h-full opacity-90 mix-blend-multiply">
+              <pattern id="blueprint-grid" width="10" height="10" patternUnits="userSpaceOnUse">
+                  <path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(0,0,0,0.05)" strokeWidth="0.5"/>
+              </pattern>
+              <rect width="120" height="120" fill="url(#blueprint-grid)" />
+              <text x="60" y="14" fontSize="6" fontWeight="bold" fill={mainColor} textAnchor="middle" fontFamily="Courier New">
+                  {(title || "").toUpperCase()}
+              </text>
+              {type === 'phone' ? (
+                  <g transform="translate(10, 22)">
+                      <g transform="translate(0, 0)">
+                          <rect width="32" height="66" rx="4" fill="none" stroke={goldColor} strokeWidth="1" />
+                          <rect x="2" y="2" width="28" height="62" rx="3" fill="none" stroke={mainColor} strokeWidth="0.5" />
+                          <circle cx="16" cy="33" r="5" fill="rgba(0,0,0,0.05)" stroke={mainColor} strokeWidth="0.3"/>
+                          <text x="16" y="33" fontSize="2.5" fontWeight="bold" fill={mainColor} textAnchor="middle" alignmentBaseline="middle">DISPLAY</text>
+                          <text x="16" y="74" fontSize="4" fontWeight="bold" fill={mainColor} textAnchor="middle">FRONT</text>
+                      </g>
+                      <g transform="translate(42, 0)">
+                          <rect width="32" height="66" rx="4" fill="none" stroke={goldColor} strokeWidth="1" />
+                          <rect x="3" y="3" width="12" height="14" rx="2" fill="none" stroke={mainColor} strokeWidth="0.5" />
+                          <circle cx="7" cy="7" r="2.5" fill="none" stroke={mainColor} strokeWidth="0.5"/>
+                          <circle cx="7" cy="13" r="2.5" fill="none" stroke={mainColor} strokeWidth="0.5"/>
+                          {isPro && <circle cx="12" cy="10" r="2.5" fill="none" stroke={mainColor} strokeWidth="0.5"/>}
+                          <text x="16" y="74" fontSize="4" fontWeight="bold" fill={mainColor} textAnchor="middle">REAR</text>
+                      </g>
+                      <g transform="translate(84, 0)">
+                          <rect width="6" height="66" rx="3" fill="none" stroke={goldColor} strokeWidth="1" />
+                          <rect x="-1" y="15" width="1" height="6" fill={mainColor} />
+                          <rect x="-1" y="25" width="1" height="10" fill={mainColor} />
+                          <text x="3" y="74" fontSize="4" fontWeight="bold" fill={mainColor} textAnchor="middle">SIDE</text>
+                      </g>
+                  </g>
+              ) : (
+                  <g transform="translate(15, 30)">
+                      <rect width="90" height="50" rx="4" fill="none" stroke={goldColor} strokeWidth="1" />
+                      <circle cx="45" cy="25" r="8" fill="rgba(0,0,0,0.05)" stroke={mainColor} strokeWidth="0.3"/>
+                      <text x="45" y="25" fontSize="4" fontWeight="bold" fill={mainColor} textAnchor="middle" alignmentBaseline="middle">TECH VIEW</text>
+                  </g>
+              )}
+              <text x="60" y="108" fontSize="4" fontWeight="bold" fill={mainColor} textAnchor="middle">TECHNICAL BLUEPRINT</text>
+          </svg>
+      );
+    }
+
+    function DynamicFlagshipCard({ product }) {
+      const bgText = (product.title || "PRO").toUpperCase();
+      
+      return (
+        <div className="w-full h-full bg-white relative overflow-hidden flex flex-col rounded-xl shadow-inner border border-slate-200">
+            <div className="absolute inset-0 flex items-center justify-center overflow-hidden z-0 px-4 pointer-events-none">
+                <span 
+                   className="font-black text-slate-50 tracking-tighter transform -rotate-12 opacity-80 select-none text-center whitespace-nowrap"
+                   style={{ fontSize: bgText.length > 10 ? '70px' : '90px' }}
+                >
+                    {bgText}
+                </span>
+            </div>
+            <div className="absolute top-[38px] left-[38px] right-[38px] bottom-[136px] z-10 flex items-center justify-center drop-shadow-2xl mix-blend-multiply">
+                 {product.imageUrl ? (
+                    <img src={product.imageUrl} alt={product.title} className="w-full h-full object-contain mix-blend-multiply" />
+                 ) : (
+                    <span className="text-slate-300 font-bold tracking-widest text-xs">商品實機圖</span>
+                 )}
+            </div>
+            <div className="absolute bottom-[38px] left-[38px] right-[38px] z-20 text-left">
+                <h3 className="text-2xl font-black text-slate-800 tracking-wide leading-none mb-2">{product.title}</h3>
+                <div className="inline-flex bg-gradient-to-r from-[#E4C271] to-yellow-600 text-white text-[11px] font-bold px-3 py-1 rounded shadow-sm max-w-full whitespace-normal leading-tight">
+                    {product.specs?.['機身顏色']?.split('、')[0] || '經典配色'}
+                </div>
+            </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // 主應用程式 App 組件
+    // ==========================================
+    function App() {
+      const [systemView, setSystemView] = useState('frontend'); 
+      const [backendCategory, setBackendCategory] = useState('Apple');
+      const [toast, setToast] = useState({ show: false, msg: '', type: 'info' });
+
+      // 後台狀態
+      const [user, setUser] = useState(null);
+      const [officialImg, setOfficialImg] = useState(null);
+      const [brandLogoImgs, setBrandLogoImgs] = useState({ apple: null, samsung: null, quanzhan: null });
+      const [modelName, setModelName] = useState('');
+      const [deviceColor, setDeviceColor] = useState('');
+      
+      // 後台規格狀態
+      const [inputBrand, setInputBrand] = useState('Apple');
+      const [inputSalePrice, setInputSalePrice] = useState('');
+      const [inputRearCam, setInputRearCam] = useState('');
+      const [inputFrontCam, setInputFrontCam] = useState('');
+      const [inputBattery, setInputBattery] = useState('');
+      const [inputMaterial, setInputMaterial] = useState('');
+      const [inputSize, setInputSize] = useState(''); 
+      const [inputPS, setInputPS] = useState(''); 
+      const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+      const [hiddenStaticProducts, setHiddenStaticProducts] = useState([]);
+      const [websiteProducts, setWebsiteProducts] = useState([]);
+      const [isUploading, setIsUploading] = useState(false);
+      const canvas1Ref = useRef(null);
+      const canvas2Ref = useRef(null);
+
+      // 前台狀態
+      const [isMenuOpen, setIsMenuOpen] = useState(false);
+      const [selectedProduct, setSelectedProduct] = useState(null);
+      const [activeCategory, setActiveCategory] = useState('New'); 
+      const [frontendActiveView, setFrontendActiveView] = useState('商品明細列表'); 
+
+      const showToast = (msg, type = 'info') => {
+        setToast({ show: true, msg, type });
+        setTimeout(() => setToast({ show: false, msg: '', type: 'info' }), 4000);
+      };
+
+      // ?? 小幫手修復：在這裡補上了下載 Canvas 圖片的處理函數
+      const downloadCanvas = (canvasRef, filename) => {
+        if (!canvasRef.current) return;
+        const link = document.createElement('a');
+        link.download = filename;
+        link.href = canvasRef.current.toDataURL('image/jpeg', 0.9);
+        link.click();
+      };
+
+      useEffect(() => {
+        if (!auth) {
+            const loadLogos = () => {
+                const apple = new Image(); apple.src = LOGO_ASSETS.apple;
+                const samsung = new Image(); samsung.src = LOGO_ASSETS.samsung;
+                const quanzhan = new Image(); quanzhan.src = LOGO_ASSETS.quanzhan;
+                quanzhan.onload = () => setBrandLogoImgs({ apple, samsung, quanzhan });
+            }
+            loadLogos();
+            return;
+        }
+        
+        const initAuth = async () => {
+          try {
+            if (typeof window.__initial_auth_token !== 'undefined' && window.__initial_auth_token) {
+              await signInWithCustomToken(auth, window.__initial_auth_token);
+            } else if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+              await signInWithCustomToken(auth, __initial_auth_token);
+            } else {
+              await signInAnonymously(auth);
+            }
+          } catch (err) {
+            console.error("Auth error:", err);
+          }
+        };
+        initAuth();
+        
+        const unsubscribeAuth = onAuthStateChanged(auth, setUser);
+
+        const loadLogos = () => {
+            const apple = new Image(); apple.src = LOGO_ASSETS.apple;
+            const samsung = new Image(); samsung.src = LOGO_ASSETS.samsung;
+            const quanzhan = new Image(); quanzhan.src = LOGO_ASSETS.quanzhan;
+            quanzhan.onload = () => setBrandLogoImgs({ apple, samsung, quanzhan });
+        }
+        loadLogos();
+
+        return () => unsubscribeAuth && unsubscribeAuth();
+      }, []);
+
+      useEffect(() => {
+        if (!user || !db) return;
+        const appIdStr = typeof appId === 'string' ? appId : 'quanzhan-gen-v1';
+        try {
+          const q = collection(db, 'artifacts', appIdStr, 'public', 'data', 'website_products');
+          const unsubscribe = onSnapshot(q, (snapshot) => {
+            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setWebsiteProducts(data.sort((a, b) => b.createdAt - a.createdAt)); 
+          }, (error) => {
+            console.error("Firestore onSnapshot error:", error);
+          });
+          return () => unsubscribe();
+        } catch (e) {
+          console.error("Error setting up Firestore listener", e);
+        }
+      }, [user, db, appId]);
+
+      // ==========================================
+      // 後台邏輯
+      // ==========================================
+      const loadProductToForm = (item) => {
+        setModelName(item.title || item.model || '');
+        setInputBrand(item.brand || 'Apple');
+        setDeviceColor(item.specs?.['機身顏色'] || item.color || '');
+        setInputRearCam(item.specs?.['後鏡頭'] || '');
+        setInputFrontCam(item.specs?.['前鏡頭'] || '');
+        setInputSalePrice(item.specs?.['銓展價'] || '');
+        setInputMaterial(item.specs?.['材質'] || '');
+        setInputSize(item.specs?.['商品尺寸'] || ''); 
+        setInputBattery(item.specs?.['電池容量'] || '');
+        setInputPS(item.specs?.['PS (附註)'] || item.specs?.['PS (備註)'] || ''); 
+        
+        showToast(`已成功載入「${item.title || item.model}」規格，請上傳照片並點擊發布。`, "success");
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      };
+
+      const handleDocUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        setIsAnalyzing(true);
+        showToast("系統 AI 分析文件規格中...", "info");
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const text = event.target.result;
+          
+          setTimeout(() => {
+            const lines = text.split('\n');
+            lines.forEach(line => {
+              const l = line.toLowerCase().replace(/\s/g, '');
+              if (l.includes('品牌:')) setInputBrand(line.split(':')[1]?.trim() || 'Apple');
+              if (l.includes('型號:')) setModelName(line.split(':')[1]?.trim() || '');
+              if (l.includes('顏色:')) setDeviceColor(line.split(':')[1]?.trim() || '');
+              if (l.includes('後鏡頭:')) setInputRearCam(line.split(':')[1]?.trim() || '');
+              if (l.includes('前鏡頭:')) setInputFrontCam(line.split(':')[1]?.trim() || '');
+              if (l.includes('電池:')) setInputBattery(line.split(':')[1]?.trim() || '');
+              if (l.includes('材質:')) setInputMaterial(line.split(':')[1]?.trim() || '');
+              if (l.includes('尺寸:')) setInputSize(line.split(':')[1]?.trim() || ''); 
+              if (l.includes('破盤:') || l.includes('銓展價:')) setInputSalePrice(line.split(':')[1]?.trim() || '');
+              if (l.includes('備註:') || l.includes('附註:') || l.includes('ps:')) setInputPS(line.split(':')[1]?.trim() || '');
+            });
+            setIsAnalyzing(false);
+            showToast("? 解析成功！型號、顏色與規格已自動填入。", "success");
+          }, 1500);
+        };
+        reader.readAsText(file);
+      };
+
+      const handleImageUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+                setOfficialImg(img);
+                showToast("圖片上傳成功！展示圖與藍圖已自動生成。", "success");
+            };
+            img.src = event.target.result;
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+
+      const handleClearForm = () => {
+        setOfficialImg(null);
+        setModelName('');
+        setDeviceColor('');
+        setInputBrand('Apple');
+        setInputSalePrice('');
+        setInputRearCam('');
+        setInputFrontCam('');
+        setInputBattery('');
+        setInputMaterial('');
+        setInputSize('');
+        setInputPS('');
+        showToast("表單已清空，準備新增下一筆商品。", "info");
+      };
+
+      const handleSaveToDatabase = async () => {
+        if (!officialImg || !modelName) {
+          showToast("?? 請先上傳照片並輸入型號，系統才能分析產圖！", "error");
+          return;
+        }
+        setIsUploading(true);
+        try {
+          const detailListImgUrl = canvas1Ref.current.toDataURL('image/jpeg', 0.85);
+          const lensListImgUrl = canvas2Ref.current.toDataURL('image/jpeg', 0.85); 
+          
+          if(!db || !user) {
+             showToast("?? [展示模式] 存檔成功！商品已自動上架至前台展示區。", "success");
+             setIsUploading(false);
+             return;
+          }
+          
+          const appIdStr = typeof appId === 'string' ? appId : 'quanzhan-gen-v1';
+          await addDoc(collection(db, 'artifacts', appIdStr, 'public', 'data', 'website_products'), {
+            model: modelName,
+            color: deviceColor,
+            brand: inputBrand,
+            specs: {
+              "商品尺寸": inputSize || "依原廠公告",
+              "材質": inputMaterial || "依原廠公告",
+              "後鏡頭": inputRearCam || "依原廠公告",
+              "前鏡頭": inputFrontCam || "依原廠公告",
+              "電池容量": inputBattery || "依原廠公告",
+              "銓展價": inputSalePrice || "專屬破盤價",
+              "機身顏色": deviceColor || "標準色",
+              "PS (附註)": inputPS || " "
+            },
+            detailListImage: detailListImgUrl,
+            lensListImage: lensListImgUrl,
+            imageFormat: '600x600_optimized_jpg',
+            createdAt: Date.now()
+          });
+          showToast("?? 存檔成功！商品已自動上架至前台展示區。", "success");
+          handleClearForm(); 
+        } catch (e) {
+          showToast("上傳失敗，請確認權限或網路狀態。", "error");
+          console.error(e);
+        }
+        setIsUploading(false);
+      };
+
+      const deleteEntry = async (id) => {
+        if (!db || !user) {
+             showToast("展示模式無法刪除雲端資料。", "error");
+             return;
+        }
+        try {
+          const appIdStr = typeof appId === 'string' ? appId : 'quanzhan-gen-v1';
+          await deleteDoc(doc(db, 'artifacts', appIdStr, 'public', 'data', 'website_products', id));
+          showToast("商品已從網站下架。", "success");
+        } catch(e) {
+          showToast("下架失敗，權限不足或網路錯誤。", "error");
+        }
+      };
+
+      // ==========================================
+      // 前台邏輯
+      // ==========================================
+      const getFilteredProducts = () => {
+        const backendItems = websiteProducts.map(wp => {
+            let specs = { ...wp.specs };
+            
+            // ?? 小幫手修復：加強切割防呆功能，避免資料缺少導致畫面死當
+            if (specs['官方售價']) delete specs['官方售價'];
+            if (specs['記憶體與容量'] && specs['銓展價'] && !String(specs['銓展價']).includes('=')) {
+                const mems = String(specs['記憶體與容量']).split(' / ');
+                const sPrices = String(specs['銓展價']).split(' / ');
+                specs['銓展價'] = mems.map((m, i) => `${m}=${sPrices[i] || '破盤價'}${sPrices[i] && !String(sPrices[i]).includes('元') && !String(sPrices[i]).includes('起') ? '元' : ''}`).join(' / ');
+                delete specs['記憶體與容量'];
+            }
+            if (specs['PS (備註)']) {
+                specs['PS (附註)'] = specs['PS (備註)'];
+                delete specs['PS (備註)'];
+            }
+            
+            return {
+                id: wp.id,
+                brand: wp.brand || (wp.model ? wp.model.split(' ')[0] : "最新上架"),
+                type: "phone",
+                title: wp.model || "未命名商品",
+                launch: "上市時間：2026年03月", 
+                features: ["全新上架旗艦機種", "請洽詢門市最新優惠", "銓展通訊專屬保證"],
+                annotations: blankAnnotations,
+                specs: specs || { 
+                  "商品尺寸": "依原廠公告", 
+                  "材質": "依原廠公告", 
+                  "後鏡頭": "依原廠公告", 
+                  "前鏡頭": "依原廠公告", 
+                  "電池容量": "依原廠公告", 
+                  "銓展價": "專屬破盤價", 
+                  "機身顏色": wp.color || "標準色",
+                  "PS (附註)": " "
+                },
+                isFromBackend: true,
+                lensListImage: wp.lensListImage,      
+                detailListImage: wp.detailListImage,  
+                imageUrl: wp.detailListImage 
+            };
+        });
+
+        const staticItems = frontendProducts.map(p => ({
+            ...p,
+            isStatic: true,
+            originalId: p.id
+        }));
+
+        const all = [...backendItems, ...staticItems].map(p => ({
+          ...p,
+          isNew: p.isFromBackend || checkIsNew(p.launch)
+        }));
+
+        if (activeCategory === 'New') return all.filter(p => p.isNew);
+        return all.filter(p => {
+          if (activeCategory === '平板') return p.type === 'tablet';
+          if (activeCategory === '手錶/配件') return p.type === 'watch' || p.type === 'audio';
+          return p.brand === activeCategory && p.type === 'phone';
+        });
+      };
+
+      const filterHidden = p => !hiddenStaticProducts.includes(p.isStatic ? p.originalId : p.id);
+      
+      const backendDisplayList = getFilteredProducts().filter(filterHidden);
+      const displayProducts = getFilteredProducts().filter(filterHidden);
+
+      // ==========================================
+      // 後台繪圖模組 
+      // ==========================================
+      const drawFlagship = () => {
+        const canvas = canvas1Ref.current;
+        if (!canvas || systemView !== 'backend') return;
+        const ctx = canvas.getContext('2d');
+        const size = 600;
+        canvas.width = size; canvas.height = size;
+        
+        const theme = getBrandTheme(inputBrand);
+
+        ctx.fillStyle = theme.bg; 
+        ctx.fillRect(0, 0, size, size);
+
+        ctx.strokeStyle = theme.frame;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(15, 15, size - 30, size - 30);
+
+        ctx.save();
+        ctx.fillStyle = theme.bgText; 
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        const bgText = (modelName || "PRO").toUpperCase();
+        
+        let fontSize = 110;
+        ctx.font = `bold ${fontSize}px 'Arial Black', sans-serif`;
+        while (ctx.measureText(bgText).width > size - 60 && fontSize > 40) {
+          fontSize -= 5;
+          ctx.font = `bold ${fontSize}px 'Arial Black', sans-serif`;
+        }
+        ctx.fillText(bgText, size/2, size/2);
+        ctx.restore();
+
+        if (officialImg) {
+          const gap = 38; 
+          const startY = 60;
+          const topUIBottom = startY + 24;
+          const topBoundary = topUIBottom + gap; 
+          const bottomUITop = size - 65; 
+          const bottomBoundary = bottomUITop - gap; 
+          const leftBoundary = gap;
+          const rightBoundary = size - gap;
+          const maxW = rightBoundary - leftBoundary;
+          const maxH = bottomBoundary - topBoundary;
+
+          const scale = Math.min(maxW / officialImg.width, maxH / officialImg.height);
+          const dw = officialImg.width * scale;
+          const dh = officialImg.height * scale;
+          const x = leftBoundary + (maxW - dw) / 2;
+          const y = topBoundary + (maxH - dh) / 2;
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.ellipse(size / 2, y + dh - 5, dw * 0.38, 12, 0, 0, Math.PI * 2);
+          ctx.shadowColor = "rgba(0, 0, 0, 0.4)";
+          ctx.shadowBlur = 25;
+          ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
+          ctx.fill();
+          ctx.restore();
+
+          ctx.drawImage(officialImg, x, y, dw, dh);
+        } else {
+          ctx.fillStyle = "rgba(255,255,255,0.1)"; ctx.fillRect(150, 150, 300, 300);
+          ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.font = "18px 'Microsoft JhengHei'"; ctx.textAlign = "center";
+          ctx.fillText("請上傳商品照片", size/2, size/2);
+        }
+
+        ctx.save();
+        ctx.textAlign = "left";
+        ctx.textBaseline = "alphabetic";
+        const startX = 35, startY = 60;
+        const logoSize = 32;
+        let textOffset = 0;
+
+        const tintLogo = (img, imgX, imgY, w, h) => {
+          const offCanvas = document.createElement('canvas'); offCanvas.width = w; offCanvas.height = h;
+          const octx = offCanvas.getContext('2d'); octx.drawImage(img, 0, 0, w, h);
+          octx.globalCompositeOperation = 'source-in'; octx.fillStyle = theme.text; octx.fillRect(0,0,w,h);
+          ctx.drawImage(offCanvas, imgX, imgY, w, h);
+        };
+
+        if (inputBrand === 'Apple' && brandLogoImgs.apple) {
+          tintLogo(brandLogoImgs.apple, startX, startY - 26, logoSize, logoSize);
+          textOffset = logoSize + 12;
+        } else if (inputBrand === 'Samsung' && brandLogoImgs.samsung) {
+          tintLogo(brandLogoImgs.samsung, startX, startY - 26, logoSize * 1.8, logoSize);
+          textOffset = (logoSize * 1.8) + 12;
+        }
+        
+        ctx.fillStyle = theme.text;
+        ctx.font = "bold 28px 'Microsoft JhengHei', sans-serif";
+        ctx.fillText((modelName || '產品型號').toUpperCase(), startX + textOffset, startY);
+
+        if (deviceColor) {
+          ctx.font = "bold 13px 'Microsoft JhengHei', sans-serif";
+          const colorTextW = ctx.measureText(deviceColor).width + 20;
+          const colorStartY = startY + 12;
+
+          ctx.beginPath();
+          ctx.roundRect ? ctx.roundRect(startX + textOffset, colorStartY, colorTextW, 24, 6) : ctx.rect(startX + textOffset, colorStartY, colorTextW, 24); 
+          ctx.fillStyle = "rgba(228, 194, 113, 0.2)"; 
+          ctx.fill();
+          ctx.strokeStyle = "rgba(228, 194, 113, 0.8)"; 
+          ctx.lineWidth = 1;
+          ctx.stroke();
+
+          ctx.fillStyle = theme.text; 
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(deviceColor, startX + textOffset + colorTextW / 2, colorStartY + 12);
+        }
+        ctx.restore();
+
+        if (brandLogoImgs.quanzhan) {
+          const logoW = 210; 
+          const logoH = 210 * (120 / 450); 
+          ctx.drawImage(brandLogoImgs.quanzhan, size - logoW - 8, size - logoH - 25, logoW, logoH);
+        }
+
+        ctx.save();
+        ctx.textAlign = "left";
+        ctx.fillStyle = theme.text;
+        ctx.font = "bold 15px 'Microsoft JhengHei', sans-serif";
+        ctx.fillText("銓展通訊 | 桃園市龜山區中興路 402 號", 25, size - 45);
+        ctx.fillStyle = "#E4C271";
+        ctx.font = "bold 13px Arial";
+        ctx.fillText("SINCE 1989 | 統編：80089553 | 電話：03-3590858", 25, size - 22);
+        ctx.restore();
+      };
+
+      const drawEngineeringDiagram = () => {
+        const canvas = canvas2Ref.current;
+        if (!canvas || systemView !== 'backend') return;
+        const ctx = canvas.getContext('2d');
+        const size = 600;
+        canvas.width = size; canvas.height = size;
+        const template = getDeviceTemplate(modelName);
+        const isIphone = template.includes('iphone');
+        const isUltra = template === 'samsung-ultra';
+        const isSamsung = template.includes('samsung');
+
+        ctx.fillStyle = "#FFFFFF"; ctx.fillRect(0, 0, size, size);
+        
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.04)"; ctx.lineWidth = 1;
+        ctx.strokeRect(15, 15, size - 30, size - 30);
+
+        const goldColor = "#E4C271"; 
+        const mainColor = "#121619"; 
+
+        ctx.save();
+        ctx.textAlign = "center";
+        const logoSize = 38; 
+        let textOffset = 0;
+        if (isIphone && brandLogoImgs.apple) {
+          ctx.drawImage(brandLogoImgs.apple, size/2 - 145, 30, logoSize, logoSize);
+          textOffset = 15;
+        } else if (isSamsung && brandLogoImgs.samsung) {
+          ctx.drawImage(brandLogoImgs.samsung, size/2 - 175, 30, logoSize * 1.8, logoSize);
+          textOffset = 30;
+        }
+        ctx.fillStyle = mainColor; 
+        ctx.font = "bold 34px 'Courier New', sans-serif"; 
+        ctx.fillText((modelName || 'TECHNICAL BLUEPRINT').toUpperCase(), size/2 + textOffset, 65);
+        ctx.restore();
+
+        ctx.save();
+        ctx.strokeStyle = goldColor; 
+        ctx.fillStyle = mainColor; 
+        ctx.translate(0, 125); 
+        ctx.scale(1.3, 1.3);
+        ctx.lineWidth = 1.15; 
+
+        const phoneW = 96, phoneH = 200, startY = 0;
+        const borderRadius = isUltra ? 4 : 14;
+
+        const drawLens = (x, y, r) => {
+          ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+          ctx.beginPath(); ctx.arc(x, y, r * 0.5, 0, Math.PI * 2); ctx.stroke();
+        };
+
+        const drawButton = (x, y, w, h, label, symbol) => {
+            ctx.save();
+            ctx.beginPath(); 
+            ctx.roundRect ? ctx.roundRect(x, y, w, h, 1.5) : ctx.rect(x, y, w, h); 
+            ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.stroke();
+            ctx.fillStyle = goldColor; ctx.font = "bold 8px Arial"; ctx.textAlign = "center";
+            ctx.fillText(symbol, x + w/2, y + h/2 + 3);
+            ctx.font = "bold 9px 'Microsoft JhengHei'"; ctx.fillStyle = mainColor;
+            ctx.fillText(label, w < 0 ? x-22 : x+w+22, y + h/2 + 3); 
+            ctx.restore();
+        };
+        
+        const tFront = 48, tBack = 188, tSideL = 338, tSideR = 398;
+
+        ctx.save(); ctx.translate(tFront, startY);
+        ctx.beginPath(); ctx.roundRect ? ctx.roundRect(0, 0, phoneW, phoneH, borderRadius) : ctx.rect(0, 0, phoneW, phoneH); ctx.stroke();
+        ctx.beginPath(); ctx.roundRect ? ctx.roundRect(4, 4, phoneW-8, phoneH-8, Math.max(0, borderRadius-2)) : ctx.rect(4, 4, phoneW-8, phoneH-8); ctx.stroke();
+        
+        ctx.save();
+        ctx.strokeStyle = "rgba(228, 194, 113, 0.2)"; 
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(4, 4); ctx.lineTo(phoneW-4, phoneH-4);
+        ctx.moveTo(phoneW-4, 4); ctx.lineTo(4, phoneH-4);
+        ctx.stroke();
+        
+        ctx.beginPath(); ctx.arc(phoneW/2, phoneH/2, 12, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.8)"; ctx.fill(); ctx.stroke();
+        ctx.fillStyle = mainColor;
+        ctx.font = "bold 6px 'Arial'"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText("DISPLAY", phoneW/2, phoneH/2);
+        ctx.restore();
+
+        if (isSamsung) {
+            ctx.beginPath(); ctx.moveTo(phoneW/2 - 10, 6); ctx.lineTo(phoneW/2 + 10, 6); ctx.stroke();
+            ctx.beginPath(); ctx.arc(phoneW/2, 16, 3, 0, Math.PI * 2); ctx.fill();
+            ctx.save();
+            ctx.strokeStyle = "rgba(228, 194, 113, 0.5)"; ctx.setLineDash([2, 2]);
+            ctx.beginPath(); ctx.arc(phoneW/2, phoneH - 35, 10, 0, Math.PI * 2); ctx.stroke();
+            ctx.restore();
+        } else {
+            ctx.beginPath(); ctx.roundRect ? ctx.roundRect(phoneW/2-22, 10, 44, 12, 6) : ctx.rect(phoneW/2-22, 10, 44, 12); ctx.fill(); ctx.stroke();
+            ctx.save(); ctx.fillStyle = "#FFFFFF";
+            ctx.beginPath(); ctx.arc(phoneW/2 + 12, 16, 2, 0, Math.PI * 2); ctx.fill();
+            ctx.restore();
+            ctx.beginPath(); ctx.roundRect ? ctx.roundRect(phoneW/2 - 25, phoneH - 10, 50, 2, 1) : ctx.rect(phoneW/2 - 25, phoneH - 10, 50, 2); ctx.fill();
+        }
+        ctx.textAlign = "center"; ctx.font = "bold 12px 'Microsoft JhengHei'"; ctx.fillText("正面視圖", phoneW/2, phoneH + 25);
+        ctx.restore();
+
+        ctx.save(); ctx.translate(tBack, startY);
+        ctx.beginPath(); ctx.roundRect ? ctx.roundRect(0, 0, phoneW, phoneH, borderRadius) : ctx.rect(0, 0, phoneW, phoneH); ctx.stroke();
+        if (!isSamsung) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(8, 8, 46, 46, 10) : ctx.rect(8, 8, 46, 46); ctx.stroke(); }
+        if (template === 'iphone-pro') { drawLens(22, 22, 10); drawLens(22, 44, 10); drawLens(44, 33, 10); }
+        else if (template === 'iphone-std') { drawLens(31, 22, 11); drawLens(31, 44, 11); }
+        else if (template === 'samsung-ultra') { drawLens(24, 25, 9); drawLens(24, 50, 9); drawLens(24, 75, 9); drawLens(50, 60, 6); }
+        else { drawLens(26, 25, 8); drawLens(26, 50, 8); drawLens(26, 75, 8); }
+        
+        ctx.globalAlpha = 0.5;
+        if (isSamsung && brandLogoImgs.samsung) { ctx.drawImage(brandLogoImgs.samsung, phoneW/2-20, phoneH/2, 40, 20); }
+        else if (brandLogoImgs.apple) { ctx.drawImage(brandLogoImgs.apple, phoneW/2-10, phoneH/2-12, 20, 26); }
+        ctx.globalAlpha = 1.0;
+        ctx.textAlign = "center"; ctx.font = "bold 12px 'Microsoft JhengHei'"; ctx.fillText("背面視圖", phoneW/2, phoneH + 25);
+        ctx.restore();
+
+        const sideW = 14;
+        ctx.save(); ctx.translate(tSideL, startY);
+        ctx.beginPath(); ctx.roundRect ? ctx.roundRect(0, 0, sideW, phoneH, 7) : ctx.rect(0, 0, sideW, phoneH); ctx.stroke();
+        if (isIphone) {
+            drawButton(0, 35, -3, 12, "動作鍵", "★");
+            drawButton(0, 60, -3, 22, "音量+", "+");
+            drawButton(0, 88, -3, 22, "音量-", "-");
+        }
+        ctx.textAlign = "center"; ctx.font = "bold 12px 'Microsoft JhengHei'"; ctx.fillText("左側視圖", sideW/2, phoneH + 25);
+        ctx.restore();
+
+        ctx.save(); ctx.translate(tSideR, startY);
+        ctx.beginPath(); ctx.roundRect ? ctx.roundRect(0, 0, sideW, phoneH, 7) : ctx.rect(0, 0, sideW, phoneH); ctx.stroke();
+        if (isIphone) {
+            drawButton(sideW, 70, 3, 30, "電源鍵", "?");
+            drawButton(sideW, 130, 3, 30, "相機控制", "??");
+        } else {
+            drawButton(sideW, 55, 3, 40, "音量鍵", "±");
+            drawButton(sideW, 105, 3, 25, "電源鍵", "?");
+        }
+        ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-4, 10, 4, 60, 2) : ctx.rect(-4, 10, 4, 60); ctx.stroke();
+        ctx.textAlign = "center"; ctx.font = "bold 12px 'Microsoft JhengHei'"; ctx.fillText("右側視圖", sideW/2, phoneH + 25);
+        ctx.restore();
+        
+        ctx.restore();
+
+        ctx.save();
+        ctx.textAlign = "center";
+        ctx.fillStyle = mainColor;
+        ctx.font = "bold 20px 'Microsoft JhengHei', sans-serif";
+        ctx.fillText("全商品技術工程圖集 | 產品技術規格圖解", size/2, size - 75);
+        
+        ctx.fillStyle = goldColor;
+        ctx.font = "bold 14px 'Microsoft JhengHei', sans-serif";
+        ctx.fillText("店名：銓展通訊 | 地址：桃園市龜山區中興路 402 號", size/2, size - 42);
+        ctx.font = "12px Arial";
+        ctx.fillText("SINCE 1989 | 統編：80089553 | 電話：03-3590858", size/2, size - 20);
+        ctx.restore();
+      };
+
+      useEffect(() => {
+        drawFlagship();
+        drawEngineeringDiagram();
+      }, [officialImg, modelName, deviceColor, inputBrand, systemView]);
+
+      const getBrandBtnClass = (catName, isActive) => {
+        const base = "px-4 py-1.5 text-xs md:text-sm border transition rounded-full font-bold tracking-wider whitespace-nowrap";
+        if (!isActive) return `${base} border-slate-600 text-slate-400 bg-transparent hover:border-slate-400 hover:text-slate-200`;
+        switch (catName) {
+          case 'New': return `${base} border-yellow-500 text-yellow-900 bg-gradient-to-b from-yellow-300 to-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.4)] animate-pulse`;
+          case 'Apple': return `${base} border-slate-400 text-slate-900 bg-gradient-to-b from-gray-200 to-gray-400 shadow-[0_0_10px_rgba(255,255,255,0.2)]`;
+          case 'Samsung': return `${base} border-blue-500 text-white bg-gradient-to-b from-blue-500 to-blue-700 shadow-[0_0_10px_rgba(59,130,246,0.5)]`;
+          case 'OPPO': return `${base} border-emerald-500 text-white bg-gradient-to-b from-emerald-500 to-emerald-700 shadow-[0_0_10px_rgba(16,185,129,0.5)]`;
+          case 'vivo': return `${base} border-indigo-500 text-white bg-gradient-to-b from-indigo-500 to-indigo-700 shadow-[0_0_10px_rgba(99,102,241,0.5)]`;
+          case '小米': return `${base} border-orange-500 text-white bg-gradient-to-b from-orange-500 to-orange-700 shadow-[0_0_10px_rgba(249,115,22,0.5)]`;
+          default: return `${base} border-slate-400 text-white bg-gradient-to-b from-slate-600 to-slate-800 shadow-[0_0_10px_rgba(255,255,255,0.2)]`;
+        }
+      };
+
+      const titaniumTextLight = "text-transparent bg-clip-text bg-gradient-to-b from-white via-gray-200 to-gray-400";
+      const pencilText = "text-slate-400 font-light tracking-wide";
+
+      return (
+        <div className={`min-h-screen ${systemView === 'frontend' ? 'bg-[#0f172a] text-slate-300' : 'bg-slate-50 text-slate-900'} flex flex-col font-sans relative transition-colors duration-500 pb-24`}>
+          
+          {/* Toast 提示元件 */}
+          {toast.show && (
+            <div className={`fixed top-6 right-6 z-[999] flex items-center p-4 mb-4 text-sm rounded-lg shadow-xl transform transition-all duration-300 animate-in slide-in-from-top-4 ${
+              toast.type === 'error' ? 'bg-red-100 text-red-800 border border-red-200' : 
+              toast.type === 'success' ? 'bg-green-100 text-green-800 border border-green-200' : 
+              'bg-blue-100 text-blue-800 border border-blue-200'
+            }`}>
+              {toast.type === 'error' ? <AlertCircle className="w-5 h-5 mr-2" /> : <CheckCircle className="w-5 h-5 mr-2" />}
+              <span className="font-bold tracking-wide">{toast.msg}</span>
+            </div>
+          )}
+
+          {/* ================= 前台 / 後台 全域浮動切換器 ================= */}
+          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-[999]">
+            <div className="bg-black/40 backdrop-blur-xl p-1.5 rounded-full shadow-2xl border border-white/20 inline-flex flex-row items-center gap-1">
+              <button
+                onClick={() => {
+                  setSystemView('frontend');
+                  showToast("已切換至 數位門市 (前台模式)", "success");
+                }}
+                className={`px-5 py-2.5 rounded-full text-sm font-black transition-all duration-300 flex items-center gap-2 ${systemView === 'frontend' ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg scale-105' : 'text-slate-300 hover:bg-white/10'}`}
+              >
+                <Store size={18} /> 數位門市前台
+              </button>
+              <div className="w-[1px] h-6 bg-white/20 mx-1"></div>
+              <button
+                onClick={() => {
+                  setSystemView('backend');
+                  showToast("已切換至 自動上架中樞 (後台模式)", "success");
+                }}
+                className={`px-5 py-2.5 rounded-full text-sm font-black transition-all duration-300 flex items-center gap-2 ${systemView === 'backend' ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg scale-105' : 'text-slate-300 hover:bg-white/10'}`}
+              >
+                <Database size={18} /> 自動上架後台
+              </button>
+            </div>
+          </div>
+
+          {systemView === 'frontend' ? (
+            /* ================= 數位門市 (前台視圖) ================= */
+            <>
+              <div className="fixed inset-0 z-0 pointer-events-none opacity-[0.03]" 
+                   style={{ backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '30px 30px' }}>
+              </div>
+
+              <nav className="bg-[#0f172a]/95 backdrop-blur-md border-b border-slate-700 sticky top-0 z-40">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                  <div className="flex justify-between h-20">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 flex items-center justify-center">
+                         <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-lg">
+                            <rect x="5" y="5" width="90" height="90" rx="20" fill="url(#gradLogo)" stroke="#94a3b8" strokeWidth="2" />
+                            <defs>
+                              <linearGradient id="gradLogo" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stopColor="#1e293b" />
+                                <stop offset="100%" stopColor="#0f172a" />
+                              </linearGradient>
+                            </defs>
+                            <path d="M 30 30 L 70 30 L 70 70 L 30 70 Z" fill="none" stroke="#e2e8f0" strokeWidth="6" rx="5" />
+                            <path d="M 50 20 L 50 40" stroke="#3b82f6" strokeWidth="6" strokeLinecap="round" />
+                            <path d="M 20 50 L 40 50" stroke="#3b82f6" strokeWidth="6" strokeLinecap="round" />
+                            <path d="M 60 60 L 80 80" stroke="#e2e8f0" strokeWidth="8" strokeLinecap="round" />
+                            <circle cx="50" cy="50" r="8" fill="#3b82f6" />
+                         </svg>
+                      </div>
+
+                      <div className="flex flex-col justify-center mt-0.5">
+                        <h1 className={`text-xl md:text-2xl font-black tracking-[0.2em] ${titaniumTextLight} leading-none mb-1.5 flex items-center gap-3`}>
+                          {companyInfo.name}
+                          <RealTimeStatus />
+                        </h1>
+                        <span className={`text-[10px] md:text-[11px] font-medium ${pencilText} italic tracking-[0.2em] leading-none`}>
+                          {companyInfo.slogan}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="hidden md:grid grid-cols-3 gap-x-2 gap-y-1.5 ml-auto mr-6 items-center content-center">
+                       {['商品鏡頭列表', '商品明細列表', '商品比較列表', '門號申辦', '無卡分期', '好物推薦'].map((btn) => (
+                          <button 
+                            key={btn} 
+                            onClick={() => setFrontendActiveView(btn)}
+                            className={`px-2.5 py-1 border text-[10px] lg:text-[11px] font-bold rounded transition tracking-widest flex items-center justify-center whitespace-nowrap shadow-sm ${
+                               frontendActiveView === btn
+                                 ? 'bg-slate-200 text-slate-900 border-white shadow-[0_0_10px_rgba(255,255,255,0.3)]'
+                                 : 'bg-transparent border-slate-500/80 text-slate-300 hover:bg-slate-700 hover:border-slate-300 hover:text-white'
+                            }`}
+                          >
+                             {btn}
+                          </button>
+                       ))}
+                    </div>
+
+                     <div className="flex items-center md:hidden">
+                      <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-slate-400 hover:text-white">
+                        {isMenuOpen ? <X size={28} /> : <Menu size={28} />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </nav>
+
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 relative z-10">
+                <div className="mb-8 border-b border-slate-800 pb-6 flex flex-col md:flex-row justify-between items-start gap-6">
+                     <div className="flex flex-col gap-2.5 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+                        <div className="flex gap-1.5 min-w-max">
+                           {brandCategories.map((cat) => (
+                             <button 
+                               key={cat.name} 
+                               onClick={() => setActiveCategory(cat.name)}
+                               className={getBrandBtnClass(cat.name, activeCategory === cat.name)}
+                             >
+                               {cat.label}
+                             </button>
+                           ))}
+                        </div>
+                        <div className="flex gap-1.5 min-w-max">
+                           {typeCategories.map((cat) => (
+                             <button 
+                               key={cat.name} 
+                               onClick={() => setActiveCategory(cat.name)}
+                               className={getBrandBtnClass(cat.name, activeCategory === cat.name)}
+                             >
+                               {cat.label}
+                             </button>
+                           ))}
+                        </div>
+                     </div>
+                     
+                     <div className="flex flex-col items-start md:items-end md:ml-auto mt-0">
+                        <h2 className={`text-2xl md:text-3xl font-black ${titaniumTextLight} tracking-[0.3em] leading-none`}>
+                           旗艦規格
+                        </h2>
+                        <h2 className={`text-2xl md:text-3xl font-black text-slate-500 tracking-[0.3em] leading-none`}>
+                           破盤價格
+                        </h2>
+                     </div>
+                </div>
+
+                {frontendActiveView === '商品鏡頭列表' ? (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in duration-500">
+                      {displayProducts.length === 0 && activeCategory === 'New' && (
+                          <div className="col-span-full py-24 flex flex-col items-center justify-center text-slate-500 border-2 border-dashed border-slate-700 rounded-2xl bg-[#1e293b]/50">
+                             <Zap size={48} className="mb-4 opacity-50 text-yellow-500" />
+                             <h3 className="text-xl font-bold text-slate-300 mb-2">最新上架區準備中</h3>
+                             <p className="text-sm tracking-widest font-mono">老闆即將上架最新旗艦商品，敬請期待！</p>
+                          </div>
+                      )}
+                      {displayProducts.map((product) => (
+                        <div key={product.id} className="bg-[#e2e8f0]/95 p-5 md:p-6 rounded-2xl border-2 border-white/20 relative overflow-hidden shadow-2xl flex flex-col sm:flex-row items-stretch min-h-[250px] transition-all duration-300 group hover:border-[#E4C271]">
+                            <div className="sm:w-[40%] z-10 sm:pr-4 flex flex-col justify-between mb-6 sm:mb-0 shrink-0">
+                                <div>
+                                    <h3 className="text-2xl font-bold leading-tight mb-1 text-slate-900">
+                                        {product.title}
+                                    </h3>
+                                    <p className="text-[11px] text-slate-600 font-mono mb-4 border-b border-slate-300 pb-3 inline-block">{product.launch}</p>
+                                    
+                                    <ul className="text-xs space-y-2.5 mb-6 text-slate-700 font-bold list-none">
+                                        {product.features?.map((feature, idx) => (
+                                          <li key={idx} className="flex items-start gap-2">
+                                             <span className="text-slate-400 mt-[2px]">‧</span>
+                                             <span className="leading-tight tracking-wide">{feature}</span>
+                                          </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                                <button 
+                                   onClick={() => setSelectedProduct(product)}
+                                   className="self-start px-6 py-1.5 bg-transparent border border-slate-800 text-slate-900 text-xs font-black rounded-full hover:bg-slate-800 hover:text-white transition-all shadow-sm flex items-center gap-2"
+                                >
+                                    <span>進入商品明細表</span>
+                                </button>
+                            </div>
+
+                            <div className="sm:w-[60%] flex flex-col items-center justify-center relative sm:border-l border-slate-300 sm:pl-4 pt-6 sm:pt-0 border-t sm:border-t-0 border-dashed sm:border-solid overflow-hidden bg-slate-100 rounded-xl shadow-inner p-4">
+                                <div className="w-full h-full min-h-[160px] border-2 border-dashed border-slate-300 rounded-xl flex items-center justify-center bg-white/50 relative overflow-hidden group/blueprint">
+                                   {product.isFromBackend && product.lensListImage ? (
+                                       <img src={product.lensListImage} alt="技術藍圖" className="w-full h-full object-contain mix-blend-multiply drop-shadow-xl transform group-hover/blueprint:scale-110 transition-transform duration-500 p-2" />
+                                   ) : (
+                                       <div className="relative w-full h-full flex items-center justify-center scale-110 transform group-hover/blueprint:scale-125 transition-transform duration-500 drop-shadow-xl p-4">
+                                           <DynamicBlueprint title={product.title} type={product.type} />
+                                       </div>
+                                   )}
+                                </div>
+                            </div>
+                            
+                            <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#94a3b8 1px, transparent 1px)', backgroundSize: '15px 15px' }}></div>
+                        </div>
+                      ))}
+                    </div>
+                ) : frontendActiveView === '商品明細列表' ? (
+                    <div className="bg-[#1e293b]/80 rounded-xl border border-slate-600 shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-500">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left whitespace-nowrap">
+                                <thead className="text-xs text-slate-400 uppercase bg-slate-800/80 border-b border-slate-600 tracking-widest">
+                                    <tr>
+                                        <th className="px-5 py-4 font-bold">型號 / 上市時間</th>
+                                        <th className="px-5 py-4 font-bold">材質 + 尺寸 + 電池</th>
+                                        <th className="px-5 py-4 font-bold">相機鏡頭 (後 / 前)</th>
+                                        <th className="px-5 py-4 font-bold">機身顏色</th>
+                                        <th className="px-5 py-4 font-bold text-blue-400">銓展破盤價</th>
+                                        <th className="px-5 py-4 font-bold">PS (附註)</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-700/50">
+                                    {displayProducts.map((p) => {
+                                        const sPrices = p.specs['銓展價']?.split(' / ') || [];
+                                        
+                                        return (
+                                        <tr 
+                                            key={p.id} 
+                                            onClick={() => setSelectedProduct(p)}
+                                            className="hover:bg-slate-700/60 transition-colors group cursor-pointer"
+                                            title="點擊查看完整圖文明細"
+                                        >
+                                            <td className="px-5 py-4 align-top">
+                                                <div className="font-bold text-slate-100 text-base mb-1 group-hover:text-blue-300 transition-colors whitespace-nowrap">
+                                                    {p.title}
+                                                </div>
+                                                <div className="text-[10px] text-slate-500 font-mono whitespace-nowrap">{p.launch}</div>
+                                            </td>
+                                            <td className="px-5 py-4 align-top">
+                                                <div className="text-slate-300 font-medium whitespace-nowrap leading-relaxed">
+                                                   {p.specs['材質']}<br/>
+                                                   <span className="text-emerald-400 text-xs">{p.specs['商品尺寸'] !== "依原廠公告" ? p.specs['商品尺寸'] : '尺寸依原廠'}</span><br/>
+                                                   <span className="text-slate-400 text-xs">{p.specs['電池容量']}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-5 py-4 align-top whitespace-nowrap text-slate-300">
+                                                <div className="mb-1"><span className="text-slate-500 text-[10px] mr-1">後</span>{p.specs['後鏡頭']}</div>
+                                                <div><span className="text-slate-500 text-[10px] mr-1">前</span>{p.specs['前鏡頭']}</div>
+                                            </td>
+                                            <td className="px-5 py-4 align-top">
+                                                <div className="text-[11px] text-slate-500 whitespace-normal max-w-[120px] leading-relaxed">{p.specs['機身顏色']}</div>
+                                            </td>
+                                            <td className="px-5 py-4 text-left align-top">
+                                                <div className="flex flex-col gap-1.5">
+                                                    {sPrices.map((priceStr, i) => (
+                                                        <div key={`sp-${p.id}-${i}`} className="font-black text-blue-400 text-[13px] tracking-wider whitespace-nowrap">
+                                                            {formatCombinedPrice(priceStr)}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <span className="text-[10px] text-blue-300 opacity-0 group-hover:opacity-100 transition-opacity tracking-widest mt-2 block">點擊看 3D 圖文 →</span>
+                                            </td>
+                                            <td className="px-5 py-4 align-top">
+                                                {p.specs['PS (附註)']?.trim() ? (
+                                                    <div className="text-slate-400 text-xs whitespace-normal max-w-[100px]">{p.specs['PS (附註)']}</div>
+                                                ) : null}
+                                            </td>
+                                        </tr>
+                                    )})}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="py-24 text-center text-slate-500 border border-dashed border-slate-700 rounded-2xl animate-in zoom-in-95 duration-300">
+                         <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-800 mb-4 shadow-inner">
+                            <Search size={28} className="text-slate-400" />
+                         </div>
+                         <h3 className="text-xl font-bold text-slate-300 mb-2">{frontendActiveView}</h3>
+                         <p className="text-sm tracking-widest font-mono">SYSTEM_MODULE_UNDER_CONSTRUCTION</p>
+                    </div>
+                )}
+              </div>
+
+              {/* 前台：商品明細彈窗 */}
+              {selectedProduct && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                  <div className="absolute inset-0 bg-slate-900/95 backdrop-blur-md" onClick={() => setSelectedProduct(null)}></div>
+                  
+                  {/* ? 更新：設定 md:p-8 pt-[20px] 讓右側標題剛好貼齊一格 20px 網格線 */}
+                  <div className="relative w-full max-w-6xl bg-[#0f172a] border border-slate-500 shadow-[0_0_80px_rgba(0,0,0,0.8)] overflow-hidden rounded-xl animate-in fade-in zoom-in duration-300 flex flex-col md:flex-row max-h-[90vh] items-stretch">
+                     
+                     <div className="w-full md:w-[50%] bg-white p-6 flex flex-col justify-center items-center border-b md:border-b-0 md:border-r border-slate-600 relative overflow-hidden flex-1">
+                        
+                        <div className="flex-1 w-full flex items-center justify-center relative z-10 pb-6 mt-[-15px]">
+                            <div className="w-full max-w-[460px] aspect-square relative flex items-center justify-center">
+                                {/* ? 需求：將品牌認證文字移至照片內部右上角，無背景色，與標題同為白色對齊，靠近邊框 */}
+                                <div className="absolute top-[8.5%] right-[5%] z-20 pointer-events-none">
+                                   <span className="text-white text-[11px] font-bold tracking-widest drop-shadow-md">
+                                       {selectedProduct.brand} 台灣原廠公司貨
+                                   </span>
+                                </div>
+                                
+                                {selectedProduct.isFromBackend ? (
+                                    <img src={selectedProduct.detailListImage} alt="尊榮展示圖" className="w-full h-full object-contain mix-blend-multiply drop-shadow-2xl rounded-xl border border-slate-200" />
+                                ) : (
+                                    <div className="w-full h-full transition-transform duration-500 hover:scale-[1.02]">
+                                       <DynamicFlagshipCard product={selectedProduct} />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        
+                        <div className="flex w-full gap-4 mt-auto relative z-20">
+                            <a href="tel:033590858" target="_top" className="flex-1 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white py-3 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02]">
+                                <PhoneCall size={18}/> 門市通話
+                            </a>
+                            <a href="https://maps.google.com/?q=桃園市龜山區中興路402號" target="_blank" rel="noreferrer" className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 text-white py-3 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02]">
+                                <MapPin size={18}/> 導航前往
+                            </a>
+                        </div>
+                     </div>
+
+                     {/* ? 需求：利用 pt-[20px] 讓標題與關閉按鈕對齊第一格網格線 */}
+                     <div className="w-full md:w-[50%] p-6 pt-[20px] md:px-8 md:pb-8 md:pt-[20px] overflow-y-auto flex flex-col bg-[#0f172a] relative flex-1">
+                        <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'linear-gradient(#94a3b8 1px, transparent 1px), linear-gradient(90deg, #94a3b8 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
+                        
+                        <div className="flex justify-between items-start mb-5 relative z-10 -mt-1.5">
+                           <div className="pt-0 flex flex-col">
+                              <div className="flex items-end gap-4 mb-2">
+                                  <h2 className="text-3xl font-black text-white tracking-wide leading-none">{selectedProduct.title}</h2>
+                                  {/* 原本在這裡的原廠公司貨標籤已移除，移至左側照片區右上角 */}
+                              </div>
+                              <span className="text-xs text-slate-500 font-mono tracking-wider">{selectedProduct.launch}</span>
+                           </div>
+                           <div className="flex flex-col items-end gap-3 pt-0 shrink-0 ml-4">
+                               <button onClick={() => setSelectedProduct(null)} className="text-slate-400 hover:text-white transition flex items-center gap-1.5 bg-slate-800/80 px-4 py-1.5 rounded-full border border-slate-500 shadow-lg hover:bg-red-500 hover:border-red-400 group">
+                                  <span className="font-bold tracking-widest text-sm group-hover:text-white">離開</span>
+                                  <XCircle size={20} className="group-hover:scale-110 transition-transform" />
+                               </button>
+                           </div>
+                        </div>
+
+                        <div className="border border-slate-600 relative z-10 bg-slate-900 shadow-xl rounded-sm overflow-hidden mb-0 flex-1 flex flex-col">
+                           {(() => {
+                              const sPrices = selectedProduct.specs['銓展價']?.split(' / ') || [];
+                              
+                              const matSizeBatStr = `${selectedProduct.specs['材質'] || ''} + ${selectedProduct.specs['商品尺寸'] !== "依原廠公告" ? selectedProduct.specs['商品尺寸'] : '依原廠'} + ${selectedProduct.specs['電池容量'] || ''}`;
+                              const cameraStr = `後: ${selectedProduct.specs['後鏡頭']} \n前: ${selectedProduct.specs['前鏡頭']}`;
+                              
+                              const displaySpecs = {
+                                  "材質+尺寸+電池容量": matSizeBatStr,
+                                  "相機鏡頭(後/前)": cameraStr,
+                                  "機身顏色": selectedProduct.specs['機身顏色'],
+                                  "銓展破盤價": sPrices.map(p => formatCombinedPrice(p)),
+                                  "PS": selectedProduct.specs['PS (附註)']?.trim() || " "
+                              };
+
+                              return Object.entries(displaySpecs).map(([key, value], idx) => {
+                                 const isPriceRow = key === '銓展破盤價';
+
+                                 return (
+                                 <div key={key} className={`flex flex-col sm:flex-row text-sm flex-1 ${idx !== Object.entries(displaySpecs).length - 1 ? 'border-b border-slate-700/50' : ''}`}>
+                                    <div className={`sm:w-1/3 px-3 py-3 sm:px-4 sm:py-4 bg-slate-800/80 text-slate-300 font-bold sm:border-r border-b sm:border-b-0 border-slate-700/50 flex items-center tracking-widest shrink-0 ${isPriceRow ? 'min-h-[80px]' : ''}`}>
+                                       {key}
+                                    </div>
+                                    <div className={`sm:w-2/3 px-3 py-3 sm:px-4 sm:py-4 text-slate-300 font-medium tracking-wide leading-relaxed flex flex-col justify-center`}>
+                                       <div className="w-full">
+                                           {Array.isArray(value) ? (
+                                              value.map((v, i) => (
+                                                  <div key={i} className={key === '銓展破盤價' ? 'text-blue-400 font-black tracking-wider text-[15px] mb-1.5' : 'font-mono text-slate-300 mb-1'}>
+                                                      {v}
+                                                  </div>
+                                              ))
+                                           ) : (
+                                              value?.includes('\n') ? value.split('\n').map((line, i) => <div key={i} className="mb-0.5">{line}</div>) :
+                                              <div className={key === "PS" ? "text-slate-400 text-xs" : ""}>{value}</div>
+                                           )}
+                                       </div>
+                                    </div>
+                                 </div>
+                              )});
+                           })()}
+                        </div>
+                     </div>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            /* ================= 自動上架中樞 (後台視圖) ================= */
+            <div className="p-4 md:p-8 animate-in fade-in duration-500 pb-24">
+              <header className="bg-gradient-to-r from-[#001F3F] to-slate-800 text-white p-5 rounded-2xl mb-6 shadow-xl flex flex-col md:flex-row justify-between items-center gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                    <Database className="w-6 h-6 text-[#E4C271]" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-white to-[#E4C271]">
+                      銓展通訊 - 網站自動上架中樞
+                    </h1>
+                    <p className="text-xs text-blue-200 font-mono mt-1 tracking-wider">SYSTEM_ACTIVE | SECURE_CONNECTION</p>
+                  </div>
+                </div>
+                <RealTimeStatus />
+              </header>
+
+              <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+                {/* --- 左側控制台 --- */}
+                <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200 h-fit space-y-6">
+                  
+                  <div className="pb-4 border-b border-slate-100">
+                    <div className="flex justify-between items-center mb-2">
+                      <label className="block text-sm font-bold text-[#001F3F] flex items-center gap-1.5"><FileText size={16}/> 1. 規格文件智慧解析</label>
+                      {isAnalyzing && <span className="text-[10px] text-blue-500 animate-pulse flex items-center gap-1"><Cpu size={12}/> AI 運算中</span>}
+                    </div>
+                    <div className="relative border border-blue-200 bg-blue-50 rounded-xl p-3 hover:border-blue-400 transition cursor-pointer">
+                       <input type="file" accept=".txt,.json" onChange={handleDocUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                       <div className="flex items-center justify-center text-blue-700 gap-2">
+                          <UploadCloud className="w-5 h-5" />
+                          <span className="text-xs font-bold">點擊上傳規格文件 (TXT/JSON)</span>
+                       </div>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1.5 leading-tight">系統將自動分析文件，填入下方型號、顏色與規格欄位。</p>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <label className="block text-sm font-bold text-[#001F3F] flex items-center gap-1.5"><Camera size={16}/> 2. 上傳官方實機照片</label>
+                    </div>
+                    <div className="relative border-2 border-dashed border-slate-300 rounded-xl p-4 hover:border-slate-500 transition group bg-slate-50 cursor-pointer">
+                       <input type="file" accept="image/*" onChange={handleImageUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                       <div className="flex flex-col items-center justify-center text-slate-400 group-hover:text-slate-600">
+                          <Upload className="w-6 h-6 mb-2" />
+                          <span className="text-xs font-bold text-center">點擊上傳商品實機去背圖</span>
+                       </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 pt-2">
+                      <div className="col-span-2">
+                        <label className="block text-xs font-bold text-slate-700 mb-1">商品品牌</label>
+                        <select value={inputBrand} onChange={(e) => setInputBrand(e.target.value)} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 outline-none focus:ring-2 focus:ring-[#001F3F]">
+                            <option value="Apple">Apple</option>
+                            <option value="Samsung">Samsung</option>
+                            <option value="OPPO">OPPO</option>
+                            <option value="vivo">vivo</option>
+                            <option value="小米">小米</option>
+                            <option value="其他">其他</option>
+                        </select>
+                      </div>
+
+                      <div className="col-span-2">
+                        <label className="block text-xs font-bold text-slate-700 mb-1">設備型號名稱</label>
+                        <input type="text" value={modelName} onChange={(e) => setModelName(e.target.value)}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 focus:ring-2 focus:ring-[#001F3F] focus:bg-white transition outline-none" />
+                      </div>
+
+                      <div className="col-span-2">
+                        <label className="block text-xs font-bold text-slate-700 mb-1">官方定義顏色</label>
+                        <input type="text" value={deviceColor} onChange={(e) => setDeviceColor(e.target.value)}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 focus:ring-2 focus:ring-[#001F3F] focus:bg-white transition outline-none" placeholder="例如：沙漠鈦金" />
+                      </div>
+
+                      <div className="col-span-2 border-t border-slate-100 pt-3">
+                         <span className="text-xs font-bold text-slate-500 mb-2 block">?? 詳細規格 (不填入的留空即可)</span>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">機身材質</label>
+                        <input type="text" value={inputMaterial} onChange={(e) => setInputMaterial(e.target.value)}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 focus:ring-2 focus:ring-[#001F3F] transition outline-none" placeholder="例如：鋁金屬" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">商品尺寸</label>
+                        <input type="text" value={inputSize} onChange={(e) => setInputSize(e.target.value)}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 focus:ring-2 focus:ring-[#001F3F] transition outline-none" placeholder="例如：6.1 吋" />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">電池容量</label>
+                        <input type="text" value={inputBattery} onChange={(e) => setInputBattery(e.target.value)}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 focus:ring-2 focus:ring-[#001F3F] transition outline-none" placeholder="例如：4005 mAh" />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">後置鏡頭</label>
+                        <input type="text" value={inputRearCam} onChange={(e) => setInputRearCam(e.target.value)}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 focus:ring-2 focus:ring-[#001F3F] transition outline-none" placeholder="例如：4800萬" />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="block text-xs font-bold text-slate-700 mb-1">前置鏡頭</label>
+                        <input type="text" value={inputFrontCam} onChange={(e) => setInputFrontCam(e.target.value)}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 focus:ring-2 focus:ring-[#001F3F] transition outline-none" placeholder="例如：1200萬" />
+                      </div>
+                      
+                      <div className="col-span-2">
+                        <label className="block text-xs font-bold text-[#001F3F] mb-1">銓展破盤價 (記憶體+容量=價格)</label>
+                        <input type="text" value={inputSalePrice} onChange={(e) => setInputSalePrice(e.target.value)}
+                          className="w-full p-2.5 bg-blue-50 border border-blue-200 rounded-lg font-black text-blue-700 focus:ring-2 focus:ring-blue-500 transition outline-none shadow-inner" placeholder="例如：8+128GB=20000元" />
+                      </div>
+
+                      <div className="col-span-2">
+                        <label className="block text-xs font-bold text-slate-700 mb-1">PS (附註)</label>
+                        <input type="text" value={inputPS} onChange={(e) => setInputPS(e.target.value)}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 focus:ring-2 focus:ring-[#001F3F] transition outline-none" placeholder="輸入商品備註或活動訊息" />
+                      </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-200">
+                    <div className="bg-gradient-to-br from-slate-800 to-[#001F3F] p-4 rounded-xl shadow-lg">
+                      <h4 className="text-sm font-bold text-white mb-4 flex items-center"><Database className="w-4 h-4 mr-2 text-[#E4C271]"/> 資料庫管理操作</h4>
+                      
+                      <div className="flex flex-col gap-3">
+                         <button onClick={handleSaveToDatabase} disabled={isUploading}
+                           className="w-full bg-[#E4C271] text-[#001F3F] p-3 rounded-lg font-black flex justify-center items-center hover:bg-yellow-400 transition shadow-md disabled:opacity-70">
+                           {isUploading ? "資料寫入中..." : <><Cloud className="mr-2 w-5 h-5" /> ?? 存檔並發布至前台</>}
+                         </button>
+                         
+                         <button onClick={handleClearForm}
+                           className="w-full bg-white/10 text-white border border-white/20 p-2.5 rounded-lg font-bold flex justify-center items-center hover:bg-white/20 transition text-sm">
+                           <PlusSquare className="mr-2 w-4 h-4" /> ? 清空並新增下一筆
+                         </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* --- 中間預覽與網站商品資料庫 --- */}
+                <div className="xl:col-span-3 space-y-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    
+                    {/* 預覽：第一張 */}
+                    <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200 flex flex-col items-center relative group">
+                      <div className="flex justify-between items-center w-full mb-4">
+                        <div className="flex items-center gap-2">
+                           <div className="w-2 h-6 bg-[#E4C271] rounded-full"></div>
+                           <span className="font-bold text-slate-800 text-lg tracking-wide">尊榮旗艦展示圖 (智慧生成)</span>
+                        </div>
+                        <button onClick={() => downloadCanvas(canvas1Ref, `${modelName}_旗艦展示圖.jpg`)} className="text-xs bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 px-4 py-2 rounded-lg font-bold transition flex items-center gap-1">
+                          <Download size={14}/> 下載原圖
+                        </button>
+                      </div>
+                      <div className="w-full max-w-[400px] aspect-square border-4 border-slate-50 rounded-xl bg-slate-100 flex items-center justify-center p-0 overflow-hidden relative shadow-inner">
+                        <canvas ref={canvas1Ref} className="w-full h-full object-contain"></canvas>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-3 font-bold tracking-widest">此圖將自動帶入前台【商品明細列表圖】</p>
+                    </div>
+
+                    {/* 預覽：第二張 */}
+                    <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200 flex flex-col items-center relative group">
+                      <div className="flex justify-between items-center w-full mb-4">
+                        <div className="flex items-center gap-2">
+                           <div className="w-2 h-6 bg-[#001F3F] rounded-full"></div>
+                           <span className="font-bold text-slate-800 text-lg tracking-wide">全方位技術藍圖 (智慧生成)</span>
+                        </div>
+                        <button onClick={() => downloadCanvas(canvas2Ref, `${modelName}_技術藍圖.jpg`)} className="text-xs bg-[#001F3F] text-[#E4C271] hover:bg-slate-800 px-4 py-2 rounded-lg font-bold transition flex items-center gap-1 shadow-md">
+                          <Download size={14}/> 下載原圖
+                        </button>
+                      </div>
+                      <div className="w-full max-w-[400px] aspect-square border-4 border-slate-50 rounded-xl bg-slate-100 flex items-center justify-center p-0 overflow-hidden relative shadow-inner">
+                        <canvas ref={canvas2Ref} className="w-full h-full object-contain"></canvas>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-3 font-bold tracking-widest">此圖將自動帶入前台【商品鏡頭列表圖】</p>
+                    </div>
+                  </div>
+
+                  {/* 網站後台商品資料庫 */}
+                  <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
+                    <div className="flex justify-between items-end mb-4 border-b border-slate-100 pb-4">
+                        <h3 className="text-xl font-black text-slate-800 flex items-center">
+                          <Database className="mr-3 text-[#001F3F] w-6 h-6"/> 雲端商品資料庫管理 
+                          <span className="ml-3 text-sm font-normal text-slate-400 bg-slate-100 px-3 py-1 rounded-full">共 {backendDisplayList.length} 筆</span>
+                        </h3>
+                        {hiddenStaticProducts.length > 0 && (
+                            <button onClick={() => setHiddenStaticProducts([])} className="text-[10px] bg-slate-200 text-slate-600 px-2 py-1 rounded hover:bg-slate-300 transition">
+                               恢復隱藏的 {hiddenStaticProducts.length} 筆
+                            </button>
+                        )}
+                    </div>
+
+                    {/* 後台分類標籤 */}
+                    <div className="flex gap-2 mb-6 overflow-x-auto pb-2 border-b border-slate-100/50">
+                      {brandCategories.filter(c => c.name !== 'New').map(cat => (
+                        <button
+                          key={`backend-${cat.name}`}
+                          onClick={() => setBackendCategory(cat.name)}
+                          className={`px-4 py-1.5 text-xs font-bold rounded-full transition whitespace-nowrap ${backendCategory === cat.name ? 'bg-[#001F3F] text-[#E4C271] shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                        >
+                          {cat.label}
+                        </button>
+                      ))}
+                      {typeCategories.map(cat => (
+                        <button
+                          key={`backend-${cat.name}`}
+                          onClick={() => setBackendCategory(cat.name)}
+                          className={`px-4 py-1.5 text-xs font-bold rounded-full transition whitespace-nowrap ${backendCategory === cat.name ? 'bg-[#001F3F] text-[#E4C271] shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                        >
+                          {cat.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {backendDisplayList.length === 0 && (
+                        <div className="col-span-full py-12 flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
+                           <LayoutList size={48} className="mb-3 opacity-20" />
+                           <p className="text-sm font-bold tracking-widest">該分類目前無商品。</p>
+                        </div>
+                      )}
+                      {backendDisplayList.map((item) => (
+                        <div key={`db-${item.id}`} className="border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 bg-white flex flex-col relative group">
+                          
+                          {/* 一鍵載入規格重新製作 */}
+                          <button 
+                            onClick={() => loadProductToForm(item)}
+                            className="absolute top-2 right-2 bg-blue-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-20 hover:bg-blue-600 transition flex items-center gap-1"
+                          >
+                             <RefreshCw size={10} /> 載入並重製圖片
+                          </button>
+
+                          <div className="bg-gradient-to-r from-slate-800 to-slate-900 text-white p-3 text-left font-bold text-sm tracking-wide relative pr-24 flex flex-col gap-1">
+                            <div>
+                              {item.model || item.title} 
+                              {item.isStatic && <span className="ml-2 bg-blue-500/80 text-white text-[9px] px-1.5 py-0.5 rounded shadow-sm align-middle">內建</span>}
+                            </div>
+                            <div className="text-[#E4C271] font-normal text-[10px] leading-tight break-words pr-2">
+                               {item.color || item.specs?.['機身顏色'] ? `(${item.color || item.specs?.['機身顏色']})` : ''}
+                            </div>
+                          </div>
+                          
+                          <div className="flex w-full divide-x divide-slate-100 bg-slate-50 p-2 gap-2 h-32">
+                            <div className="w-1/2 flex flex-col relative group/img h-full">
+                              <div className="absolute top-1 left-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded backdrop-blur-sm z-10">明細專用圖</div>
+                              {item.isStatic ? (
+                                  <div className="w-full h-full flex items-center justify-center bg-slate-100 relative overflow-hidden border border-slate-200 rounded-lg p-2">
+                                     <DynamicFlagshipCard product={item} />
+                                  </div>
+                              ) : (
+                                  <img src={item.detailListImage} alt="明細列表圖" className="w-full h-full object-contain rounded-lg border border-slate-200 bg-white shadow-sm transition-transform group-hover/img:scale-105" />
+                              )}
+                            </div>
+                            <div className="w-1/2 flex flex-col relative group/img h-full">
+                              <div className="absolute top-1 left-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded backdrop-blur-sm z-10">規格藍圖</div>
+                              {item.isStatic ? (
+                                  <div className="w-full h-full flex items-center justify-center bg-slate-100 overflow-hidden relative border border-slate-200 rounded-lg">
+                                     <div className="w-[150%] h-[150%] transform scale-90 flex items-center justify-center">
+                                         <DynamicBlueprint title={item.title} type={item.type} />
+                                     </div>
+                                  </div>
+                              ) : (
+                                  <img src={item.lensListImage} alt="鏡頭列表圖" className="w-full h-full object-contain rounded-lg border border-slate-200 bg-white shadow-sm transition-transform group-hover/img:scale-105" />
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="p-3 text-[11px] text-slate-600 bg-slate-50 border-t border-slate-100 flex flex-col gap-1.5 h-auto max-h-32 overflow-y-auto">
+                             <div className="flex flex-col gap-0.5 border-t border-slate-200 pt-1">
+                                 <span className="font-bold text-blue-500 mb-0.5">破盤價</span>
+                                 {(() => {
+                                     const sPrices = item.specs?.['銓展價']?.split(' / ') || [];
+                                     return sPrices.map((p, i) => (
+                                         <div key={`sp-${i}`} className="text-blue-600 font-bold truncate pl-1">
+                                             {formatCombinedPrice(p)}
+                                         </div>
+                                     ));
+                                 })()}
+                             </div>
+                          </div>
+
+                          <div className="p-3 text-[11px] text-slate-500 flex justify-between items-center bg-slate-100 border-t border-slate-200">
+                            <span className="font-mono text-[9px] truncate max-w-[100px]">{item.isStatic ? '系統內建資料' : item.imageFormat}</span>
+                            <button onClick={() => {
+                                if (item.isStatic) {
+                                    setHiddenStaticProducts(prev => [...prev, item.originalId]);
+                                    showToast("內建商品已從畫面隱藏。", "success");
+                                } else {
+                                    deleteEntry(item.id);
+                                }
+                            }} className="px-3 py-1.5 bg-white border border-red-200 text-red-600 rounded-lg font-bold hover:bg-red-500 hover:text-white hover:border-red-500 transition shadow-sm flex items-center gap-1">
+                              <Trash2 size={12}/> {item.isStatic ? '隱藏商品' : '刪除下架'}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* ================= 頁尾 ================= */}
+          <footer className={`py-6 text-center text-xs flex flex-col items-center gap-1.5 font-medium tracking-wide ${systemView === 'frontend' ? 'bg-[#0B1120] text-slate-500 border-t border-slate-800 relative z-10 mt-auto' : 'bg-slate-50 text-slate-400 mt-auto'}`}>
+            <div className={`w-12 h-1 rounded-full mb-2 ${systemView === 'frontend' ? 'bg-slate-700' : 'bg-slate-300'}`}></div>
+            <p className={`font-bold ${systemView === 'frontend' ? 'text-slate-400' : 'text-slate-500'}`}>店名：銓展通訊 | 地址：桃園市龜山區中興路 402 號</p>
+            <p>統編：80089553 | 電話：<a href="tel:033590858" target="_top" className="hover:text-blue-400 hover:underline transition-colors cursor-pointer">03-3590858</a></p>
+            <p className={`text-[10px] mt-1 ${systemView === 'frontend' ? 'text-slate-600' : 'text-slate-300'}`}>c {new Date().getFullYear()} Quanzhan Communication. All rights reserved.</p>
+          </footer>
+        </div>
+      );
+    }
+
+    const root = createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
